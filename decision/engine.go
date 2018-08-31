@@ -70,7 +70,7 @@ type Engine struct {
 	// peerRequestQueue is a priority queue of requests received from peers.
 	// Requests are popped from the queue, packaged up, and placed in the
 	// outbox.
-	peerRequestQueue *prq
+	peerRequestQueue peerRequestQueue
 
 	// FIXME it's a bit odd for the client and the worker to both share memory
 	// (both modify the peerRequestQueue) and also to communicate over the
@@ -92,17 +92,24 @@ type Engine struct {
 	ticker *time.Ticker
 }
 
-func NewEngine(ctx context.Context, bs bstore.Blockstore) *Engine {
+func NewEngine(ctx context.Context, bs bstore.Blockstore, rrqCfg *RRQConfig) *Engine {
 	e := &Engine{
 		ledgerMap:        make(map[peer.ID]*ledger),
 		bs:               bs,
-		peerRequestQueue: newPRQ(),
+		peerRequestQueue: newPeerRequestQueue(rrqCfg),
 		outbox:           make(chan (<-chan *Envelope), outboxChanBuffer),
 		workSignal:       make(chan struct{}, 1),
 		ticker:           time.NewTicker(time.Millisecond * 100),
 	}
 	go e.taskWorker(ctx)
 	return e
+}
+
+func newPeerRequestQueue(rrqCfg *RRQConfig) peerRequestQueue {
+    if rrqCfg == nil {
+         return newPRQ()
+    }
+    return newSPRQ(rrqCfg)
 }
 
 func (e *Engine) WantlistForPeer(p peer.ID) (out []*wl.Entry) {
@@ -118,13 +125,7 @@ func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
 	ledger.lk.Lock()
 	defer ledger.lk.Unlock()
 
-	return &Receipt{
-		Peer:      ledger.Partner.String(),
-		Value:     ledger.Accounting.Value(),
-		Sent:      ledger.Accounting.BytesSent,
-		Recv:      ledger.Accounting.BytesRecv,
-		Exchanged: ledger.ExchangeCount(),
-	}
+	return ledger.Receipt()
 }
 
 func (e *Engine) taskWorker(ctx context.Context) {
@@ -238,9 +239,9 @@ func (e *Engine) MessageReceived(p peer.ID, m bsmsg.BitSwapMessage) error {
 			e.peerRequestQueue.Remove(entry.Cid, p)
 		} else {
 			log.Debugf("wants %s - %d", entry.Cid, entry.Priority)
-			l.Wants(entry.Cid, entry.Priority)
+			l.Wants(entry.Cid, entry.Priority, entry.Size)
 			if exists, err := e.bs.Has(entry.Cid); err == nil && exists {
-				e.peerRequestQueue.Push(entry.Entry, p)
+				e.peerRequestQueue.Push(entry.Entry, l.Receipt())
 				newWorkExists = true
 			}
 		}
@@ -249,6 +250,7 @@ func (e *Engine) MessageReceived(p peer.ID, m bsmsg.BitSwapMessage) error {
 	for _, block := range m.Blocks() {
 		log.Debugf("got block %s %d bytes", block, len(block.RawData()))
 		l.ReceivedBytes(len(block.RawData()))
+		log.Debugf("received block: debt ratio updated for %s to %f", p, l.Accounting.Value())
 	}
 	return nil
 }
@@ -259,7 +261,7 @@ func (e *Engine) addBlock(block blocks.Block) {
 	for _, l := range e.ledgerMap {
 		l.lk.Lock()
 		if entry, ok := l.WantListContains(block.Cid()); ok {
-			e.peerRequestQueue.Push(entry, l.Partner)
+			e.peerRequestQueue.Push(entry, l.Receipt())
 			work = true
 		}
 		l.lk.Unlock()
@@ -292,6 +294,7 @@ func (e *Engine) MessageSent(p peer.ID, m bsmsg.BitSwapMessage) error {
 		l.SentBytes(len(block.RawData()))
 		l.wantList.Remove(block.Cid())
 		e.peerRequestQueue.Remove(block.Cid(), p)
+		log.Debugf("sent block: debt ratio updated for %s to %f", p, l.Accounting.Value())
 	}
 
 	return nil
