@@ -46,8 +46,8 @@ func TestConsistentAccounting(t *testing.T) {
 		content := []string{"this", "is", "message", "i"}
 		m.AddBlock(blocks.NewBlock([]byte(strings.Join(content, " "))))
 
-		sender.Engine.MessageSent(receiver.Peer, m)
-		receiver.Engine.MessageReceived(sender.Peer, m)
+		sender.Engine.MessageSent(ctx, receiver.Peer, m)
+		receiver.Engine.MessageReceived(ctx, sender.Peer, m)
 	}
 
 	// Ensure sender records the change
@@ -76,8 +76,8 @@ func TestPeerIsAddedToPeersWhenMessageReceivedOrSent(t *testing.T) {
 
 	m := message.New(true)
 
-	sanfrancisco.Engine.MessageSent(seattle.Peer, m)
-	seattle.Engine.MessageReceived(sanfrancisco.Peer, m)
+	sanfrancisco.Engine.MessageSent(ctx, seattle.Peer, m)
+	seattle.Engine.MessageReceived(ctx, sanfrancisco.Peer, m)
 
 	if seattle.Peer == sanfrancisco.Peer {
 		t.Fatal("Sanity Check: Peers have same Key!")
@@ -175,7 +175,7 @@ func partnerWants(e *Engine, keys []string, partner peer.ID) {
 		block := blocks.NewBlock([]byte(letter))
 		add.AddEntry(block.Cid(), math.MaxInt32-i)
 	}
-	e.MessageReceived(partner, add)
+	e.MessageReceived(ctx, partner, add)
 }
 
 func partnerCancels(e *Engine, keys []string, partner peer.ID) {
@@ -184,7 +184,7 @@ func partnerCancels(e *Engine, keys []string, partner peer.ID) {
 		block := blocks.NewBlock([]byte(k))
 		cancels.Cancel(block.Cid())
 	}
-	e.MessageReceived(partner, cancels)
+	e.MessageReceived(ctx, partner, cancels)
 }
 
 func checkHandledInOrder(t *testing.T, e *Engine, keys []string) error {

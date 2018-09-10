@@ -71,7 +71,7 @@ func (bs *Bitswap) taskWorker(ctx context.Context, id int) {
 				// TODO: Should only track *useful* messages in ledger
 				outgoing := bsmsg.New(false)
 				outgoing.AddBlock(envelope.Block)
-				bs.engine.MessageSent(envelope.Peer, outgoing)
+				bs.engine.MessageSent(ctx, envelope.Peer, outgoing)
 
 				bs.wm.SendBlock(ctx, envelope)
 				bs.counterLk.Lock()

@@ -55,6 +55,16 @@ type Receipt struct {
 	Exchanged uint64
 }
 
+func (r Receipt) Loggable() map[string]interface{} {
+    return map[string]interface{}{
+        "peer": r.Peer,
+        "value": r.Value,
+        "sent": r.Sent,
+        "recv": r.Recv,
+        "exchanged": r.Exchanged,
+    }
+}
+
 type debtRatio struct {
 	BytesSent uint64
 	BytesRecv uint64

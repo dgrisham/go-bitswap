@@ -213,7 +213,7 @@ func (e *Engine) Peers() []peer.ID {
 
 // MessageReceived performs book-keeping. Returns error if passed invalid
 // arguments.
-func (e *Engine) MessageReceived(p peer.ID, m bsmsg.BitSwapMessage) error {
+func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwapMessage) error {
 	if len(m.Wantlist()) == 0 && len(m.Blocks()) == 0 {
 		log.Debugf("received empty message from %s", p)
 	}
@@ -250,7 +250,7 @@ func (e *Engine) MessageReceived(p peer.ID, m bsmsg.BitSwapMessage) error {
 	for _, block := range m.Blocks() {
 		log.Debugf("got block %s %d bytes", block, len(block.RawData()))
 		l.ReceivedBytes(len(block.RawData()))
-		log.Debugf("received block: debt ratio updated for %s to %f", p, l.Accounting.Value())
+		log.Event(ctx, "Bitswap.DebtRatioUpdatedOnReceive", l.Receipt())
 	}
 	return nil
 }
@@ -285,7 +285,7 @@ func (e *Engine) AddBlock(block blocks.Block) {
 // inconsistent. Would need to ensure that Sends and acknowledgement of the
 // send happen atomically
 
-func (e *Engine) MessageSent(p peer.ID, m bsmsg.BitSwapMessage) error {
+func (e *Engine) MessageSent(ctx context.Context, p peer.ID, m bsmsg.BitSwapMessage) error {
 	l := e.findOrCreate(p)
 	l.lk.Lock()
 	defer l.lk.Unlock()
@@ -294,7 +294,7 @@ func (e *Engine) MessageSent(p peer.ID, m bsmsg.BitSwapMessage) error {
 		l.SentBytes(len(block.RawData()))
 		l.wantList.Remove(block.Cid())
 		e.peerRequestQueue.Remove(block.Cid(), p)
-		log.Debugf("sent block: debt ratio updated for %s to %f", p, l.Accounting.Value())
+		log.Event(ctx, "Bitswap.DebtRatioUpdatedOnSend", l.Receipt())
 	}
 
 	return nil
