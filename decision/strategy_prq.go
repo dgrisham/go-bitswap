@@ -170,7 +170,7 @@ func (tl *sprq) partnerNextTask(partner *activePartner) *peerRequestTask {
 // ------
 
 // Remove removes a task from the queue
-func (tl *sprq) Remove(k *cid.Cid, p peer.ID) {
+func (tl *sprq) Remove(k cid.Cid, p peer.ID) {
 	tl.lock.Lock()
 	t, ok := tl.taskMap[taskKey(p, k)]
 	if ok {

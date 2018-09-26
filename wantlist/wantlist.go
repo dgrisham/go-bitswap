@@ -62,7 +62,7 @@ func New() *Wantlist {
 // TODO: think through priority changes here
 // Add returns true if the cid did not exist in the wantlist before this call
 // (even if it was under a different session)
-func (w *ThreadSafe) Add(c *cid.Cid, priority, size int, ses uint64) bool {
+func (w *ThreadSafe) Add(c cid.Cid, priority, size int, ses uint64) bool {
 	w.lk.Lock()
 	defer w.lk.Unlock()
 	k := c.KeyString()
@@ -151,7 +151,7 @@ func (w *Wantlist) Len() int {
 	return len(w.set)
 }
 
-func (w *Wantlist) Add(c *cid.Cid, priority, size int) bool {
+func (w *Wantlist) Add(c cid.Cid, priority, size int) bool {
 	k := c.KeyString()
 	if _, ok := w.set[k]; ok {
 		return false

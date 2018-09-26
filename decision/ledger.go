@@ -86,7 +86,7 @@ func (l *ledger) ReceivedBytes(n int) {
 	l.Accounting.BytesRecv += uint64(n)
 }
 
-func (l *ledger) Wants(k *cid.Cid, priority, size int) {
+func (l *ledger) Wants(k cid.Cid, priority, size int) {
 	log.Debugf("peer %s wants %s", l.Partner, k)
 	l.wantList.Add(k, priority, size)
 }
