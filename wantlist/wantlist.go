@@ -20,7 +20,7 @@ type Wantlist struct {
 }
 
 type Entry struct {
-	Cid      *cid.Cid
+	Cid      cid.Cid
 	Priority int
 	Size     int
 
@@ -28,7 +28,7 @@ type Entry struct {
 }
 
 // NewRefEntry creates a new reference tracked wantlist entry
-func NewRefEntry(c *cid.Cid, p int) *Entry {
+func NewRefEntry(c cid.Cid, p int) *Entry {
 	return &Entry{
 		Cid:      c,
 		Priority: p,
@@ -99,7 +99,7 @@ func (w *ThreadSafe) AddEntry(e *Entry, ses uint64) bool {
 // 'true' is returned if this call to Remove removed the final session ID
 // tracking the cid. (meaning true will be returned iff this call caused the
 // value of 'Contains(c)' to change from true to false)
-func (w *ThreadSafe) Remove(c *cid.Cid, ses uint64) bool {
+func (w *ThreadSafe) Remove(c cid.Cid, ses uint64) bool {
 	w.lk.Lock()
 	defer w.lk.Unlock()
 	k := c.KeyString()
@@ -118,7 +118,7 @@ func (w *ThreadSafe) Remove(c *cid.Cid, ses uint64) bool {
 
 // Contains returns true if the given cid is in the wantlist tracked by one or
 // more sessions
-func (w *ThreadSafe) Contains(k *cid.Cid) (*Entry, bool) {
+func (w *ThreadSafe) Contains(k cid.Cid) (*Entry, bool) {
 	w.lk.RLock()
 	defer w.lk.RUnlock()
 	e, ok := w.set[k.KeyString()]
@@ -175,7 +175,7 @@ func (w *Wantlist) AddEntry(e *Entry) bool {
 	return true
 }
 
-func (w *Wantlist) Remove(c *cid.Cid) bool {
+func (w *Wantlist) Remove(c cid.Cid) bool {
 	k := c.KeyString()
 	_, ok := w.set[k]
 	if !ok {
@@ -186,7 +186,7 @@ func (w *Wantlist) Remove(c *cid.Cid) bool {
 	return true
 }
 
-func (w *Wantlist) Contains(k *cid.Cid) (*Entry, bool) {
+func (w *Wantlist) Contains(k cid.Cid) (*Entry, bool) {
 	e, ok := w.set[k.KeyString()]
 	return e, ok
 }
