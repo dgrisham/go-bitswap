@@ -52,6 +52,8 @@ var log = logging.Logger("engine")
 const (
 	// outboxChanBuffer must be 0 to prevent stale messages from being sent
 	outboxChanBuffer = 0
+	// maxMessageSize is the maximum size of the batched payload
+	maxMessageSize = 512 * 1024
 )
 
 // Envelope contains a message for a Peer
@@ -59,8 +61,8 @@ type Envelope struct {
 	// Peer is the intended recipient
 	Peer peer.ID
 
-	// Block is the payload
-	Block blocks.Block
+	// Message is the payload
+	Message bsmsg.BitSwapMessage
 
 	// A callback to notify the decision queue that the task is complete
 	Sent func()
@@ -106,10 +108,10 @@ func NewEngine(ctx context.Context, bs bstore.Blockstore, rrqCfg *RRQConfig) *En
 }
 
 func newPeerRequestQueue(rrqCfg *RRQConfig) peerRequestQueue {
-    if rrqCfg == nil {
-         return newPRQ()
-    }
-    return newSPRQ(rrqCfg)
+	if rrqCfg == nil {
+		return newPRQ()
+	}
+	return newSPRQ(rrqCfg)
 }
 
 func (e *Engine) WantlistForPeer(p peer.ID) (out []*wl.Entry) {
@@ -167,21 +169,28 @@ func (e *Engine) nextEnvelope(ctx context.Context) (*Envelope, error) {
 		}
 
 		// with a task in hand, we're ready to prepare the envelope...
+		msg := bsmsg.New(true)
+		for _, entry := range nextTask.Entries {
+			block, err := e.bs.Get(entry.Cid)
+			if err != nil {
+				log.Errorf("tried to execute a task and errored fetching block: %s", err)
+				continue
+			}
+			msg.AddBlock(block)
+		}
 
-		block, err := e.bs.Get(nextTask.Entry.Cid)
-		if err != nil {
-			log.Errorf("tried to execute a task and errored fetching block: %s", err)
+		if msg.Empty() {
 			// If we don't have the block, don't hold that against the peer
 			// make sure to update that the task has been 'completed'
-			nextTask.Done()
+			nextTask.Done(nextTask.Entries)
 			continue
 		}
 
 		return &Envelope{
-			Peer:  nextTask.Target,
-			Block: block,
+			Peer:    nextTask.Target,
+			Message: msg,
 			Sent: func() {
-				nextTask.Done()
+				nextTask.Done(nextTask.Entries)
 				select {
 				case e.workSignal <- struct{}{}:
 					// work completing may mean that our queue will provide new
@@ -214,7 +223,7 @@ func (e *Engine) Peers() []peer.ID {
 // MessageReceived performs book-keeping. Returns error if passed invalid
 // arguments.
 func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwapMessage) error {
-	if len(m.Wantlist()) == 0 && len(m.Blocks()) == 0 {
+	if m.Empty() {
 		log.Debugf("received empty message from %s", p)
 	}
 
@@ -232,6 +241,8 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		l.wantList = wl.New()
 	}
 
+	var msgSize int
+	var activeEntries []*wl.Entry
 	for _, entry := range m.Wantlist() {
 		if entry.Cancel {
 			log.Debugf("%s cancel %s", p, entry.Cid)
@@ -240,13 +251,28 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		} else {
 			log.Debugf("wants %s - %d", entry.Cid, entry.Priority)
 			l.Wants(entry.Cid, entry.Priority, entry.Size)
-			if exists, err := e.bs.Has(entry.Cid); err == nil && exists {
-				e.peerRequestQueue.Push(entry.Entry, l.Receipt())
+			blockSize, err := e.bs.GetSize(entry.Cid)
+			if err != nil {
+				if err == bstore.ErrNotFound {
+					continue
+				}
+				log.Error(err)
+			} else {
+				// we have the block
 				newWorkExists = true
+				if msgSize+blockSize > maxMessageSize {
+					e.peerRequestQueue.Push(p, activeEntries...)
+					activeEntries = []*wl.Entry{}
+					msgSize = 0
+				}
+				activeEntries = append(activeEntries, entry.Entry)
+				msgSize += blockSize
 			}
 		}
 	}
-
+	if len(activeEntries) > 0 {
+		e.peerRequestQueue.Push(p, activeEntries...)
+	}
 	for _, block := range m.Blocks() {
 		log.Debugf("got block %s %d bytes", block, len(block.RawData()))
 		l.ReceivedBytes(len(block.RawData()))
@@ -261,7 +287,7 @@ func (e *Engine) addBlock(block blocks.Block) {
 	for _, l := range e.ledgerMap {
 		l.lk.Lock()
 		if entry, ok := l.WantListContains(block.Cid()); ok {
-			e.peerRequestQueue.Push(entry, l.Receipt())
+			e.peerRequestQueue.Push(l.Receipt(), entry)
 			work = true
 		}
 		l.lk.Unlock()

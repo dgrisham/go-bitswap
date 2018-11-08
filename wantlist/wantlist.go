@@ -11,12 +11,12 @@ import (
 
 type ThreadSafe struct {
 	lk  sync.RWMutex
-	set map[string]*Entry
+	set map[cid.Cid]*Entry
 }
 
 // not threadsafe
 type Wantlist struct {
-	set map[string]*Entry
+	set map[cid.Cid]*Entry
 }
 
 type Entry struct {
@@ -25,6 +25,8 @@ type Entry struct {
 	Size     int
 
 	SesTrk map[uint64]struct{}
+	// Trash in a book-keeping field
+	Trash bool
 }
 
 // NewRefEntry creates a new reference tracked wantlist entry
@@ -44,13 +46,13 @@ func (es entrySlice) Less(i, j int) bool { return es[i].Priority > es[j].Priorit
 
 func NewThreadSafe() *ThreadSafe {
 	return &ThreadSafe{
-		set: make(map[string]*Entry),
+		set: make(map[cid.Cid]*Entry),
 	}
 }
 
 func New() *Wantlist {
 	return &Wantlist{
-		set: make(map[string]*Entry),
+		set: make(map[cid.Cid]*Entry),
 	}
 }
 
@@ -65,13 +67,12 @@ func New() *Wantlist {
 func (w *ThreadSafe) Add(c cid.Cid, priority, size int, ses uint64) bool {
 	w.lk.Lock()
 	defer w.lk.Unlock()
-	k := c.KeyString()
-	if e, ok := w.set[k]; ok {
+	if e, ok := w.set[c]; ok {
 		e.SesTrk[ses] = struct{}{}
 		return false
 	}
 
-	w.set[k] = &Entry{
+	w.set[c] = &Entry{
 		Cid:      c,
 		Priority: priority,
 		SesTrk:   map[uint64]struct{}{ses: struct{}{}},
@@ -85,12 +86,11 @@ func (w *ThreadSafe) Add(c cid.Cid, priority, size int, ses uint64) bool {
 func (w *ThreadSafe) AddEntry(e *Entry, ses uint64) bool {
 	w.lk.Lock()
 	defer w.lk.Unlock()
-	k := e.Cid.KeyString()
-	if ex, ok := w.set[k]; ok {
+	if ex, ok := w.set[e.Cid]; ok {
 		ex.SesTrk[ses] = struct{}{}
 		return false
 	}
-	w.set[k] = e
+	w.set[e.Cid] = e
 	e.SesTrk[ses] = struct{}{}
 	return true
 }
@@ -102,15 +102,14 @@ func (w *ThreadSafe) AddEntry(e *Entry, ses uint64) bool {
 func (w *ThreadSafe) Remove(c cid.Cid, ses uint64) bool {
 	w.lk.Lock()
 	defer w.lk.Unlock()
-	k := c.KeyString()
-	e, ok := w.set[k]
+	e, ok := w.set[c]
 	if !ok {
 		return false
 	}
 
 	delete(e.SesTrk, ses)
 	if len(e.SesTrk) == 0 {
-		delete(w.set, k)
+		delete(w.set, c)
 		return true
 	}
 	return false
@@ -121,7 +120,7 @@ func (w *ThreadSafe) Remove(c cid.Cid, ses uint64) bool {
 func (w *ThreadSafe) Contains(k cid.Cid) (*Entry, bool) {
 	w.lk.RLock()
 	defer w.lk.RUnlock()
-	e, ok := w.set[k.KeyString()]
+	e, ok := w.set[k]
 	return e, ok
 }
 
@@ -152,12 +151,11 @@ func (w *Wantlist) Len() int {
 }
 
 func (w *Wantlist) Add(c cid.Cid, priority, size int) bool {
-	k := c.KeyString()
-	if _, ok := w.set[k]; ok {
+	if _, ok := w.set[c]; ok {
 		return false
 	}
 
-	w.set[k] = &Entry{
+	w.set[c] = &Entry{
 		Cid:      c,
 		Priority: priority,
 		Size:     size,
@@ -167,27 +165,25 @@ func (w *Wantlist) Add(c cid.Cid, priority, size int) bool {
 }
 
 func (w *Wantlist) AddEntry(e *Entry) bool {
-	k := e.Cid.KeyString()
-	if _, ok := w.set[k]; ok {
+	if _, ok := w.set[e.Cid]; ok {
 		return false
 	}
-	w.set[k] = e
+	w.set[e.Cid] = e
 	return true
 }
 
 func (w *Wantlist) Remove(c cid.Cid) bool {
-	k := c.KeyString()
-	_, ok := w.set[k]
+	_, ok := w.set[c]
 	if !ok {
 		return false
 	}
 
-	delete(w.set, k)
+	delete(w.set, c)
 	return true
 }
 
-func (w *Wantlist) Contains(k cid.Cid) (*Entry, bool) {
-	e, ok := w.set[k.KeyString()]
+func (w *Wantlist) Contains(c cid.Cid) (*Entry, bool) {
+	e, ok := w.set[c]
 	return e, ok
 }
 

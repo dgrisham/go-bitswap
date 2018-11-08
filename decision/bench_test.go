@@ -27,6 +27,6 @@ func BenchmarkTaskQueuePush(b *testing.B) {
 
 		id := peers[i%len(peers)]
 		receipt := newLedger(id).Receipt()
-		q.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32}, receipt)
+		q.Push(receipt, &wantlist.Entry{Cid: c, Priority: math.MaxInt32})
 	}
 }

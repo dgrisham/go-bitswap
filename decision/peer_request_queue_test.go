@@ -46,7 +46,7 @@ func TestPushPop(t *testing.T) {
 
 		c := cid.NewCidV0(u.Hash([]byte(letter)))
 		l := newLedger(partner).Receipt()
-		prq.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index}, l)
+		prq.Push(l, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index})
 	}
 	for _, consonant := range consonants {
 		c := cid.NewCidV0(u.Hash([]byte(consonant)))
@@ -62,7 +62,9 @@ func TestPushPop(t *testing.T) {
 			break
 		}
 
-		out = append(out, received.Entry.Cid.String())
+		for _, entry := range received.Entries {
+			out = append(out, entry.Cid.String())
+		}
 	}
 
 	// Entries popped should already be in correct order
@@ -90,10 +92,10 @@ func TestPeerRepeats(t *testing.T) {
 	rd := newLedger(d).Receipt()
 	for i := 0; i < 5; i++ {
 		elcid := cid.NewCidV0(u.Hash([]byte(fmt.Sprint(i))))
-		prq.Push(&wantlist.Entry{Cid: elcid}, ra)
-		prq.Push(&wantlist.Entry{Cid: elcid}, rb)
-		prq.Push(&wantlist.Entry{Cid: elcid}, rc)
-		prq.Push(&wantlist.Entry{Cid: elcid}, rd)
+		prq.Push(ra, &wantlist.Entry{Cid: elcid})
+		prq.Push(rb, &wantlist.Entry{Cid: elcid})
+		prq.Push(rc, &wantlist.Entry{Cid: elcid})
+		prq.Push(rd, &wantlist.Entry{Cid: elcid})
 	}
 
 	// now, pop off four entries, there should be one from each
@@ -122,7 +124,7 @@ func TestPeerRepeats(t *testing.T) {
 	for blockI := 0; blockI < 4; blockI++ {
 		for i := 0; i < 4; i++ {
 			// its okay to mark the same task done multiple times here (JUST FOR TESTING)
-			tasks[i].Done()
+			tasks[i].Done(tasks[i].Entries)
 
 			ntask := prq.Pop()
 			if ntask.Target != tasks[i].Target {
