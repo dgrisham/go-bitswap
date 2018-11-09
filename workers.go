@@ -72,7 +72,7 @@ func (bs *Bitswap) taskWorker(ctx context.Context, id int) {
 					}))
 					outgoing.AddBlock(block)
 				}
-				bs.engine.MessageSent(envelope.Peer, outgoing)
+				bs.engine.MessageSent(ctx, envelope.Peer, outgoing)
 
 				bs.wm.SendBlocks(ctx, envelope)
 				bs.counterLk.Lock()

@@ -129,7 +129,7 @@ func (tl *sprq) Pop() *peerRequestTask {
 
 	// figure out which peer should be served next
 	for tl.rrq.NumPeers() > 0 {
-		rrp = tl.rrq.Head()
+		rrp := tl.rrq.Head()
 		partner := tl.partners[rrp.id]
 		for partner.taskQueue.Len() > 0 {
 			out := partner.taskQueue.Pop().(*peerRequestTask)
@@ -178,29 +178,23 @@ func (tl *sprq) Pop() *peerRequestTask {
 	return nil
 }
 
-func (tl *sprq) partnerNextTask(partner *activePartner) *peerRequestTask {
-	for partner.taskQueue.Len() > 0 {
-		task := partner.taskQueue.Pop().(*peerRequestTask)
-		// return task if it's not trash
-		if !task.trash {
-			return task
-		}
-	}
-	return nil
-}
-
 // Remove
 // ------
 
 // Remove removes a task from the queue
 func (tl *sprq) Remove(k cid.Cid, p peer.ID) {
 	tl.lock.Lock()
-	t, ok := tl.taskMap[taskKey(p, k)]
+	t, ok := tl.taskMap[taskEntryKey{p, k}]
 	if ok {
-		// remove the task "lazily"
-		// simply mark it as trash, so it'll be dropped when popped off the
-		// queue.
-		t.trash = true
+		for _, entry := range t.Entries {
+			if entry.Cid.Equals(k) {
+				// remove the task "lazily"
+				// simply mark it as trash, so it'll be dropped when popped off the
+				// queue.
+				entry.Trash = true
+				break
+			}
+		}
 
 		// having canceled a block, we now account for that in the given partner
 		partner := tl.partners[p]
