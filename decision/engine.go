@@ -261,7 +261,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 				// we have the block
 				newWorkExists = true
 				if msgSize+blockSize > maxMessageSize {
-					e.peerRequestQueue.Push(p, activeEntries...)
+					e.peerRequestQueue.Push(l.Receipt(), activeEntries...)
 					activeEntries = []*wl.Entry{}
 					msgSize = 0
 				}
@@ -271,7 +271,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		}
 	}
 	if len(activeEntries) > 0 {
-		e.peerRequestQueue.Push(p, activeEntries...)
+		e.peerRequestQueue.Push(l.Receipt(), activeEntries...)
 	}
 	for _, block := range m.Blocks() {
 		log.Debugf("got block %s %d bytes", block, len(block.RawData()))

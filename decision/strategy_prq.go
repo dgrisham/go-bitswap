@@ -19,7 +19,7 @@ import (
 
 func newSPRQ(rrqCfg *RRQConfig) *sprq {
 	return &sprq{
-		taskMap:  make(map[string]*peerRequestTask),
+		taskMap:  make(map[taskEntryKey]*peerRequestTask),
 		partners: make(map[peer.ID]*activePartner),
 		pQueue:   pq.New(partnerCompare),
 		rrq:      newRRQueue(rrqCfg),
@@ -32,7 +32,7 @@ var _ peerRequestQueue = &sprq{}
 type sprq struct {
 	lock     sync.Mutex
 	pQueue   pq.PQ
-	taskMap  map[string]*peerRequestTask
+	taskMap  map[taskEntryKey]*peerRequestTask
 	partners map[peer.ID]*activePartner
 	rrq      *RRQueue
 }
@@ -41,7 +41,7 @@ type sprq struct {
 // ----
 
 // Push adds a new peerRequestTask to the end of the list
-func (tl *sprq) Push(entry *wantlist.Entry, receipt *Receipt) {
+func (tl *sprq) Push(receipt *Receipt, entries ...*wantlist.Entry) {
 	to := peer.ID(receipt.Peer)
 	tl.lock.Lock()
 	defer tl.lock.Unlock()
@@ -57,104 +57,127 @@ func (tl *sprq) Push(entry *wantlist.Entry, receipt *Receipt) {
 	partner.activelk.Lock()
 	defer partner.activelk.Unlock()
 
-	if partner.activeBlocks.Has(entry.Cid) {
-		return
+	var priority int
+	newEntries := make([]*wantlist.Entry, 0, len(entries))
+	for _, entry := range entries {
+		if partner.activeBlocks.Has(entry.Cid) {
+			return
+		}
+
+		if task, ok := tl.taskMap[taskEntryKey{to, entry.Cid}]; ok {
+			if entry.Priority > task.Priority {
+				task.Priority = entry.Priority
+				partner.taskQueue.Update(task.index)
+			}
+			continue
+		}
+		if entry.Priority > priority {
+			priority = entry.Priority
+		}
+		newEntries = append(newEntries, entry)
 	}
 
-	if task, ok := tl.taskMap[taskKey(to, entry.Cid)]; ok {
-		task.Entry.Priority = entry.Priority
-		partner.taskQueue.Update(task.index)
+	if len(newEntries) == 0 {
 		return
 	}
 
 	task := &peerRequestTask{
-		Entry:   entry,
+		Entries: newEntries,
 		Target:  to,
 		created: time.Now(),
-		Done: func() {
+		Done: func(e []*wantlist.Entry) {
 			tl.lock.Lock()
-			partner.TaskDone(entry.Cid)
+			for _, entry := range e {
+				partner.TaskDone(entry.Cid)
+			}
 			tl.pQueue.Update(partner.Index())
 			tl.lock.Unlock()
 		},
 	}
-
+	task.Priority = priority
 	partner.taskQueue.Push(task)
-	tl.taskMap[task.Key()] = task
-	partner.requests++
+	for _, entry := range newEntries {
+		tl.taskMap[taskEntryKey{to, entry.Cid}] = task
+	}
+	partner.requests += len(newEntries)
 	tl.pQueue.Update(partner.Index())
 
+	// TODO: figure out if this needs to change for the 'entry -> entries' update
 	tl.rrq.UpdateWeight(to, receipt)
 }
 
 // Pop
 // ---
 
-// Pop 'pops' the next task to be performed. Returns nil if no task exists.
+// Pop uses the `RRQueue` and peer `taskQueue`s to determine the next request to serve
+// TODO: confirm that this is all right (try to compile, check logic (run tests), etc.)
 func (tl *sprq) Pop() *peerRequestTask {
 	tl.lock.Lock()
 	defer tl.lock.Unlock()
 
-	// get the next peer/task to serve
-	rrp, task := tl.nextTask()
-	if task == nil {
+	if tl.pQueue.Len() == 0 {
 		return nil
 	}
-	partner := tl.partners[rrp.id]
-
-	// start the task
-	partner.StartTask(task.Entry.Cid)
-	partner.requests--
-
-	rrp.allocation -= task.Entry.Size
-
-	if rrp.allocation == 0 {
-		// peer has reached allocation limit for this round, remove peer from queue
-		tl.rrq.Pop()
-	}
-	return task
-}
-
-// nextTask() uses the `RRQueue` and peer `taskQueue`s to determine the next
-// request to serve
-func (tl *sprq) nextTask() (rrp *RRPeer, task *peerRequestTask) {
-	if tl.pQueue.Len() == 0 {
-		return nil, nil
-	}
-
 	if tl.rrq.NumPeers() == 0 {
 		// may have finished last RR round, reallocate requests to peers
 		tl.rrq.InitRound()
 		if tl.rrq.NumPeers() == 0 {
 			// if allocations still empty, there are no requests to serve
-			return nil, nil
+			return nil
 		}
 	}
 
 	// figure out which peer should be served next
 	for tl.rrq.NumPeers() > 0 {
 		rrp = tl.rrq.Head()
+		partner := tl.partners[rrp.id]
+		for partner.taskQueue.Len() > 0 {
+			out := partner.taskQueue.Pop().(*peerRequestTask)
+			var newEntries []*wantlist.Entry
+			// rem holds the remaining entries that we don't end up sending this round
+			rem := out
+			rem.Entries = make([]*wantlist.Entry, len(out.Entries))
+			copy(rem.Entries, out.Entries)
 
-		task := tl.partnerNextTask(tl.partners[rrp.id])
-		// nil task means this peer has no valid tasks to be served at the moment
-		if task == nil {
-			tl.rrq.Pop()
-			continue
+			for _, entry := range out.Entries {
+				if entry.Trash {
+					delete(tl.taskMap, taskEntryKey{out.Target, entry.Cid})
+					continue
+				}
+				// check whether serving this entry will exceed the RR allocation
+				if entry.Size <= rrp.allocation {
+					partner.requests--
+					partner.StartTask(entry.Cid)
+					newEntries = append(newEntries, entry)
+					rrp.allocation -= entry.Size
+					if rrp.allocation == 0 {
+						// peer has reached allocation limit for this round, remove peer from queue
+						tl.rrq.Pop()
+						break
+					}
+				} else {
+					break
+				}
+			}
+			// cut off all of the entries that are being sent from rem
+			rem.Entries = rem.Entries[len(newEntries):]
+			if len(rem.Entries) > 0 {
+				// push the task with the remaining entries onto the peer's taskQueue
+				partner.taskQueue.Push(rem)
+			}
+			if len(newEntries) > 0 {
+				out.Entries = newEntries
+			} else {
+				out = nil
+				tl.rrq.Pop()
+				continue
+			}
+			return out
 		}
-
-		// check whether |task| exceeds peer's round-robin allocation
-		if task.Entry.Size > rrp.allocation {
-			tl.partners[rrp.id].taskQueue.Push(task)
-			tl.rrq.Pop()
-			continue
-		}
-
-		return rrp, task
 	}
-	return nil, nil
+	return nil
 }
 
-// get first non-trash task
 func (tl *sprq) partnerNextTask(partner *activePartner) *peerRequestTask {
 	for partner.taskQueue.Len() > 0 {
 		task := partner.taskQueue.Pop().(*peerRequestTask)
