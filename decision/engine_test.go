@@ -184,6 +184,8 @@ func TestPartnerWantsThenCancels(t *testing.T) {
 }
 
 func partnerWants(e *Engine, keys []string, partner peer.ID) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	add := message.New(false)
 	for i, letter := range keys {
 		block := blocks.NewBlock([]byte(letter))
@@ -193,6 +195,8 @@ func partnerWants(e *Engine, keys []string, partner peer.ID) {
 }
 
 func partnerCancels(e *Engine, keys []string, partner peer.ID) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	cancels := message.New(false)
 	for _, k := range keys {
 		block := blocks.NewBlock([]byte(k))

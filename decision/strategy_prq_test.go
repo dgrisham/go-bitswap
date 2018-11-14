@@ -46,26 +46,24 @@ func TestSPRQPushPopLegacy(t *testing.T) {
 	sort.Strings(consonants)
 
 	// add a bunch of blocks. cancel some. drain the queue. the queue should only have the kept entries
-
 	l := newLedger(partner).Receipt()
 	l.Value = 1
+	entries := make([]*wantlist.Entry, 0, len(alphabet))
 	for _, index := range rand.Perm(len(alphabet)) { // add blocks for all letters
 		letter := alphabet[index]
 		c := cid.NewCidV0(u.Hash([]byte(letter)))
-		prq.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index}, l)
+		entries = append(entries, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index})
 	}
+	prq.Push(l, entries...)
 	for _, consonant := range consonants {
 		c := cid.NewCidV0(u.Hash([]byte(consonant)))
 		prq.Remove(c, partner)
 	}
 
+	received := prq.Pop()
 	var out []string
-	for {
-		received := prq.Pop()
-		if received == nil {
-			break
-		}
-		out = append(out, received.Entry.Cid.String())
+	for _, entry := range received.Entries {
+		out = append(out, entry.Cid.String())
 	}
 
 	// Entries popped should already be in correct order
@@ -86,18 +84,17 @@ func TestSPRQPushPopServeAll(t *testing.T) {
 	l := newLedger(partner).Receipt()
 	l.Value = 1
 	blockSize := 5
+	entries := make([]*wantlist.Entry, 0, len(alphabet))
 	for index, letter := range alphabet { // add blocks for all letters
 		c := cid.NewCidV0(u.Hash([]byte(letter)))
-		prq.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index, Size: blockSize}, l)
+		entries = append(entries, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index, Size: blockSize})
 	}
+	prq.Push(l, entries...)
 
 	expectedAllocation := roundBurst
+	received := prq.Pop()
 	var out []string
-	for {
-		received := prq.Pop()
-		if received == nil {
-			break
-		}
+	for _, entry := range received.Entries {
 		if expectedAllocation == 0 {
 			expectedAllocation = roundBurst
 		}
@@ -105,7 +102,7 @@ func TestSPRQPushPopServeAll(t *testing.T) {
 		if prq.allocationForPeer(partner) != expectedAllocation {
 			t.Fatalf("Expected allocation of %d, got %d", expectedAllocation, prq.allocationForPeer(partner))
 		}
-		out = append(out, received.Entry.Cid.String())
+		out = append(out, entry.Cid.String())
 	}
 
 	if expectedAllocation != 70 {
@@ -135,7 +132,7 @@ func TestSPRQPushPop1Round(t *testing.T) {
 	blockSize := 5
 	for index, letter := range alphabet { // add blocks for all letters
 		c := cid.NewCidV0(u.Hash([]byte(letter)))
-		prq.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index, Size: blockSize}, l)
+		prq.Push(l, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index, Size: blockSize})
 	}
 
 	expectedAllocation := 100
@@ -151,7 +148,7 @@ func TestSPRQPushPop1Round(t *testing.T) {
 		if prq.allocationForPeer(partner) != expectedAllocation {
 			t.Fatalf("Expected allocation of %d, got %d", expectedAllocation, prq.allocationForPeer(partner))
 		}
-		out = append(out, received.Entry.Cid.String())
+		out = append(out, received.Entries[0].Cid.String())
 	}
 
 	if prq.allocationForPeer(partner) != 0 {
@@ -171,7 +168,7 @@ func TestSPRQPushPop1Round(t *testing.T) {
 	}
 	for _, expected := range expectedRemaining {
 		cid := cid.NewCidV0(u.Hash([]byte(expected)))
-		if _, ok := prq.taskMap[taskKey(partner, cid)]; !ok {
+		if _, ok := prq.taskMap[taskEntryKey{partner, cid}]; !ok {
 			t.Fatalf("CID %s was not found in the peer's task map", cid)
 		}
 	}
@@ -197,7 +194,7 @@ func TestSPRQPushPop5Peers(t *testing.T) {
 		l.Value = float64(i + 1)
 		for j, letter := range strings.Split(letters, "") {
 			c := cid.NewCidV0(u.Hash([]byte(letter)))
-			prq.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32 - j, Size: blockSize}, l)
+			prq.Push(l, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - j, Size: blockSize})
 		}
 	}
 
@@ -258,7 +255,7 @@ func testStrategy(t *testing.T, strategy Strategy) {
 		for j := 0; j < len(alphabet); j += 1 {
 			// add unique cid to peer's queue
 			c := cid.NewCidV0(u.Hash([]byte(fmt.Sprintf("%s%d", alphabet[j], i))))
-			prq.Push(&wantlist.Entry{Cid: c, Priority: math.MaxInt32 - i - j, Size: blockSize}, ledgers[i])
+			prq.Push(ledgers[i], &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - i - j, Size: blockSize})
 		}
 	}
 
@@ -275,7 +272,7 @@ func testStrategy(t *testing.T, strategy Strategy) {
 		if received == nil {
 			break
 		}
-		out[received.Target] = append(out[received.Target], received.Entry.Cid.String())
+		out[received.Target] = append(out[received.Target], received.Entries[0].Cid.String())
 		// check whether round ended
 		if prq.rrq.NumPeers() == 0 {
 			break
