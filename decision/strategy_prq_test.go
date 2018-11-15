@@ -48,22 +48,25 @@ func TestSPRQPushPopLegacy(t *testing.T) {
 	// add a bunch of blocks. cancel some. drain the queue. the queue should only have the kept entries
 	l := newLedger(partner).Receipt()
 	l.Value = 1
-	entries := make([]*wantlist.Entry, 0, len(alphabet))
 	for _, index := range rand.Perm(len(alphabet)) { // add blocks for all letters
 		letter := alphabet[index]
 		c := cid.NewCidV0(u.Hash([]byte(letter)))
-		entries = append(entries, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index})
+		prq.Push(l, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index})
 	}
-	prq.Push(l, entries...)
 	for _, consonant := range consonants {
 		c := cid.NewCidV0(u.Hash([]byte(consonant)))
 		prq.Remove(c, partner)
 	}
 
-	received := prq.Pop()
 	var out []string
-	for _, entry := range received.Entries {
-		out = append(out, entry.Cid.String())
+	for {
+		received := prq.Pop()
+		if received == nil {
+			break
+		}
+		for _, entry := range received.Entries {
+			out = append(out, entry.Cid.String())
+		}
 	}
 
 	// Entries popped should already be in correct order

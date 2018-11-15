@@ -37,6 +37,14 @@ type sprq struct {
 	rrq      *RRQueue
 }
 
+func (tl *sprq) TaskMap() map[taskEntryKey]*peerRequestTask {
+	return tl.taskMap
+}
+
+func (tl *sprq) GetActivePartner(id peer.ID) *activePartner {
+	return tl.partners[id]
+}
+
 // Push
 // ----
 
@@ -135,17 +143,21 @@ func (tl *sprq) Pop() *peerRequestTask {
 			out := partner.taskQueue.Pop().(*peerRequestTask)
 			var newEntries []*wantlist.Entry
 			// rem holds the remaining entries that we don't end up sending this round
-			rem := out
+			rem := new(peerRequestTask)
+			*rem = *out
 			rem.Entries = make([]*wantlist.Entry, len(out.Entries))
 			copy(rem.Entries, out.Entries)
 
+			remove := 0
 			for _, entry := range out.Entries {
 				if entry.Trash {
 					delete(tl.taskMap, taskEntryKey{out.Target, entry.Cid})
+					remove++
 					continue
 				}
 				// check whether serving this entry will exceed the RR allocation
 				if entry.Size <= rrp.allocation {
+					delete(tl.taskMap, taskEntryKey{out.Target, entry.Cid})
 					partner.requests--
 					partner.StartTask(entry.Cid)
 					newEntries = append(newEntries, entry)
@@ -155,12 +167,13 @@ func (tl *sprq) Pop() *peerRequestTask {
 						tl.rrq.Pop()
 						break
 					}
+					remove++
 				} else {
 					break
 				}
 			}
 			// cut off all of the entries that are being sent from rem
-			rem.Entries = rem.Entries[len(newEntries):]
+			rem.Entries = rem.Entries[remove:]
 			if len(rem.Entries) > 0 {
 				// push the task with the remaining entries onto the peer's taskQueue
 				partner.taskQueue.Push(rem)
