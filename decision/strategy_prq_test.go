@@ -78,7 +78,52 @@ func TestSPRQPushPopLegacy(t *testing.T) {
 	}
 }
 
-func TestSPRQPushPopServeAll(t *testing.T) {
+func TestSPRQPushPopServeAllMultipleTasks(t *testing.T) {
+	roundBurst := 100
+	prq := newSPRQ(&RRQConfig{RoundBurst: roundBurst, Strategy: Identity})
+	partner := testutil.RandPeerIDFatal(t)
+	alphabet := strings.Split("abcdefghijklmnopqrstuvwxyz", "")
+
+	l := newLedger(partner).Receipt()
+	l.Value = 1
+	blockSize := 5
+	for index, letter := range alphabet { // add blocks for all letters
+		c := cid.NewCidV0(u.Hash([]byte(letter)))
+		prq.Push(l, &wantlist.Entry{Cid: c, Priority: math.MaxInt32 - index, Size: blockSize})
+	}
+
+	expectedAllocation := roundBurst
+	var out []string
+	for {
+		received := prq.Pop()
+		if received == nil {
+			break
+		}
+		if expectedAllocation == 0 {
+			expectedAllocation = roundBurst
+		}
+		expectedAllocation -= blockSize
+		if prq.allocationForPeer(partner) != expectedAllocation {
+			t.Fatalf("Expected allocation of %d, got %d", expectedAllocation, prq.allocationForPeer(partner))
+		}
+		out = append(out, received.Entries[0].Cid.String())
+	}
+
+	if expectedAllocation != 70 {
+		t.Fatalf("Peer should have ended with 70 allocation, but had %d", expectedAllocation)
+	}
+	if len(out) != len(alphabet) {
+		t.Fatalf("Expected %d blocks popped, got %d", len(alphabet), len(out))
+	}
+	for i, expected := range alphabet {
+		exp := cid.NewCidV0(u.Hash([]byte(expected))).String()
+		if out[i] != exp {
+			t.Fatalf("Expected %s, received %s", exp, out[i])
+		}
+	}
+}
+
+func TestSPRQPushPopServeAllOneTask(t *testing.T) {
 	roundBurst := 100
 	prq := newSPRQ(&RRQConfig{RoundBurst: roundBurst, Strategy: Identity})
 	partner := testutil.RandPeerIDFatal(t)
@@ -94,30 +139,26 @@ func TestSPRQPushPopServeAll(t *testing.T) {
 	}
 	prq.Push(l, entries...)
 
-	expectedAllocation := roundBurst
 	received := prq.Pop()
 	var out []string
 	for _, entry := range received.Entries {
-		if expectedAllocation == 0 {
-			expectedAllocation = roundBurst
-		}
-		expectedAllocation -= blockSize
-		if prq.allocationForPeer(partner) != expectedAllocation {
-			t.Fatalf("Expected allocation of %d, got %d", expectedAllocation, prq.allocationForPeer(partner))
-		}
 		out = append(out, entry.Cid.String())
 	}
 
-	if expectedAllocation != 70 {
-		t.Fatalf("Peer should have ended with 70 allocation, but had %d", expectedAllocation)
+	if prq.allocationForPeer(partner) != 0 {
+		t.Fatalf("Peer should have ended with 0 allocation, but had %d", prq.allocationForPeer(partner))
 	}
-	if len(out) != len(alphabet) {
+	if len(out) != roundBurst/blockSize {
 		t.Fatalf("Expected %d blocks popped, got %d", len(alphabet), len(out))
 	}
-	for i, expected := range alphabet {
-		exp := cid.NewCidV0(u.Hash([]byte(expected))).String()
-		if out[i] != exp {
-			t.Fatalf("Expected %s, received %s", exp, out[i])
+	for i := 0; i < roundBurst/blockSize; i++ {
+		if i >= roundBurst/blockSize {
+			// TODO
+			break
+		}
+		expected := cid.NewCidV0(u.Hash([]byte(alphabet[i]))).String()
+		if out[i] != expected {
+			t.Fatalf("Expected %s, received %s", expected, out[i])
 		}
 	}
 }

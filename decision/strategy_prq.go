@@ -162,12 +162,12 @@ func (tl *sprq) Pop() *peerRequestTask {
 					partner.StartTask(entry.Cid)
 					newEntries = append(newEntries, entry)
 					rrp.allocation -= entry.Size
+					remove++
 					if rrp.allocation == 0 {
 						// peer has reached allocation limit for this round, remove peer from queue
 						tl.rrq.Pop()
 						break
 					}
-					remove++
 				} else {
 					break
 				}
@@ -187,6 +187,8 @@ func (tl *sprq) Pop() *peerRequestTask {
 			}
 			return out
 		}
+		// peer's taskQueue is empty, pop them from rrq
+		tl.rrq.Pop()
 	}
 	return nil
 }
