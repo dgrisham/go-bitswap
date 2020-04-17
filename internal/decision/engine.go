@@ -4,6 +4,7 @@ package decision
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -177,7 +178,6 @@ func NewEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger,
 // This constructor is used by the tests
 func newEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID,
 	maxReplaceSize int, scoreLedger ScoreLedger) *Engine {
-
 	e := &Engine{
 		ledgerMap:                       make(map[peer.ID]*ledger),
 		scoreLedger:                     scoreLedger,
@@ -549,6 +549,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 	// Push entries onto the request queue
 	if len(activeEntries) > 0 {
 		e.peerRequestQueue.PushTasks(p, activeEntries...)
+		e.peerRequestQueue.SetWeight(p, int(math.Floor(l.Accounting.Value()))) // TODO
 	}
 }
 
