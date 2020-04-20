@@ -549,6 +549,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 	// Push entries onto the request queue
 	if len(activeEntries) > 0 {
 		e.peerRequestQueue.PushTasks(p, activeEntries...)
+		// make sure peer has an weight associated weight
 		e.peerRequestQueue.SetWeight(p, int(math.Floor(l.Accounting.Value()))) // TODO
 	}
 }
@@ -628,8 +629,11 @@ func (e *Engine) ReceiveFrom(from peer.ID, blks []blocks.Block, haves []cid.Cid)
 						SendDontHave: false,
 					},
 				})
+
 			}
 		}
+		// update peer weight since ledge value changed
+		e.peerRequestQueue.SetWeight(l.Partner, int(math.Floor(l.Accounting.Value()))) // TODO
 		l.lk.RUnlock()
 	}
 	e.lock.RUnlock()
@@ -657,6 +661,8 @@ func (e *Engine) MessageSent(p peer.ID, m bsmsg.BitSwapMessage) {
 		e.scoreLedger.AddToSentBytes(l.Partner, len(block.RawData()))
 		l.wantList.RemoveType(block.Cid(), pb.Message_Wantlist_Block)
 	}
+	// update peer weight since ledge value changed
+	e.peerRequestQueue.SetWeight(p, int(math.Floor(l.Accounting.Value()))) // TODO
 
 	// Remove sent block presences from the want list for the peer
 	for _, bp := range m.BlockPresences() {
