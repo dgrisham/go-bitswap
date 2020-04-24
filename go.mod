@@ -31,4 +31,6 @@ require (
 	go.uber.org/zap v1.14.1
 )
 
+replace github.com/ipfs/go-peertaskqueue => ../go-peertaskqueue
+
 go 1.12
