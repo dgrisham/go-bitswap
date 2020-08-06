@@ -276,6 +276,7 @@ type counters struct {
 	blocksRecvd    uint64
 	dupBlocksRecvd uint64
 	dupDataRecvd   uint64
+	blockDataRecvd uint64
 	blocksSent     uint64
 	dataSent       uint64
 	dataRecvd      uint64
@@ -414,6 +415,8 @@ func (bs *Bitswap) receiveBlocksFrom(ctx context.Context, from peer.ID, blks []b
 func (bs *Bitswap) ReceiveMessage(ctx context.Context, p peer.ID, incoming bsmsg.BitSwapMessage) {
 	bs.counterLk.Lock()
 	bs.counters.messagesRecvd++
+	// Track all the data receiveid (including control messages)
+	bs.counters.dataRecvd += uint64(incoming.Size())
 	bs.counterLk.Unlock()
 
 	// This call records changes to wantlists, blocks received,
@@ -472,7 +475,7 @@ func (bs *Bitswap) updateReceiveCounters(blocks []blocks.Block) {
 		c.dataRecvd += uint64(blkLen)
 		if has {
 			c.dupBlocksRecvd++
-			c.dupDataRecvd += uint64(blkLen)
+			c.blockDataRecvd += uint64(blkLen)
 		}
 	}
 }
