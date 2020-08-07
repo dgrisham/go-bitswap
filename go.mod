@@ -31,4 +31,5 @@ require (
 	go.uber.org/zap v1.14.1
 )
 
+// replace github.com/ipfs/go-bitswap => github.com/adlrocha/go-bitswap v0.2.19
 go 1.12
