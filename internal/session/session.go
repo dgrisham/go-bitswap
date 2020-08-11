@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	bsbpm "github.com/ipfs/go-bitswap/internal/blockpresencemanager"
@@ -94,6 +95,7 @@ const (
 type op struct {
 	op   opType
 	keys []cid.Cid
+	from peer.ID
 }
 
 // Session holds state for an individual bitswap transfer operation.
@@ -111,6 +113,11 @@ type Session struct {
 
 	sw  sessionWants
 	sws sessionWantSender
+
+	// Used to track times that we need to resort to DHT
+	numDHTProviders map[cid.Cid][]peer.ID
+	numDHTCount     uint64
+	numDHTLock      sync.Mutex
 
 	latencyTrkr latencyTracker
 
@@ -159,6 +166,7 @@ func New(
 		pm:                  pm,
 		sprm:                sprm,
 		providerFinder:      providerFinder,
+		numDHTProviders:     make(map[cid.Cid][]peer.ID),
 		sim:                 sim,
 		incoming:            make(chan op, 128),
 		latencyTrkr:         latencyTracker{},
@@ -181,8 +189,11 @@ func (s *Session) ID() uint64 {
 	return s.id
 }
 
-func (s *Session) Shutdown() {
+func (s *Session) Shutdown() uint64 {
 	s.shutdown()
+	// Return the numDHT count when shutting down the session
+	// so it is updated in the seessionManager.
+	return s.numDHTCount
 }
 
 // ReceiveFrom receives incoming blocks from the given peer.
@@ -205,7 +216,7 @@ func (s *Session) ReceiveFrom(from peer.ID, ks []cid.Cid, haves []cid.Cid, dontH
 
 	// Inform the session that blocks have been received
 	select {
-	case s.incoming <- op{op: opReceive, keys: ks}:
+	case s.incoming <- op{op: opReceive, keys: ks, from: from}:
 	case <-s.ctx.Done():
 	}
 }
@@ -304,7 +315,7 @@ func (s *Session) run(ctx context.Context) {
 			switch oper.op {
 			case opReceive:
 				// Received blocks
-				s.handleReceive(oper.keys)
+				s.handleReceive(oper.keys, oper.from)
 			case opWant:
 				// Client wants blocks
 				s.wantBlocks(ctx, oper.keys)
@@ -393,6 +404,9 @@ func (s *Session) findMorePeers(ctx context.Context, c cid.Cid) {
 			// When a provider indicates that it has a cid, it's equivalent to
 			// the providing peer sending a HAVE
 			s.sws.Update(p, nil, []cid.Cid{c}, nil)
+			// Track peers found through the DHT.
+			s.numDHTProviders[k] = append(s.numDHTProviders[k], p)
+
 		}
 	}(c)
 }
@@ -411,8 +425,22 @@ func (s *Session) handleShutdown() {
 	s.sm.RemoveSession(s.id)
 }
 
+// Update times that we resorted to the DHT
+func (s *Session) updateNumDHT(ks []cid.Cid, from peer.ID) {
+	// If the block found belongs to one of the peers in the provder
+	s.numDHTLock.Lock()
+	defer s.numDHTLock.Unlock()
+	for k := range ks {
+		for _, p := range s.numDHTProviders[ks[k]] {
+			if p == from {
+				s.numDHTCount++
+			}
+		}
+	}
+}
+
 // handleReceive is called when the session receives blocks from a peer
-func (s *Session) handleReceive(ks []cid.Cid) {
+func (s *Session) handleReceive(ks []cid.Cid, from peer.ID) {
 	// Record which blocks have been received and figure out the total latency
 	// for fetching the blocks
 	wanted, totalLatency := s.sw.BlocksReceived(ks)
@@ -420,8 +448,12 @@ func (s *Session) handleReceive(ks []cid.Cid) {
 		return
 	}
 
+	// Record NUM_DHT
+	s.updateNumDHT(wanted, from)
 	// Record latency
 	s.latencyTrkr.receiveUpdate(len(wanted), totalLatency)
+
+	//Record num times DHT
 
 	// Inform the SessionInterestManager that this session is no longer
 	// expecting to receive the wanted keys

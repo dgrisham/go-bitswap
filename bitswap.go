@@ -203,12 +203,15 @@ func New(parent context.Context, network bsnet.BitSwapNetwork,
 
 	// bind the context and process.
 	// do it over here to avoid closing before all setup is done.
-	go func() {
+	go func(bs *Bitswap) {
 		<-px.Closing() // process closes first
-		sm.Shutdown()
+		// Update numDHT counters for session when shutting down manager,
+		bs.counterLk.Lock()
+		bs.counters.numDHT = sm.Shutdown()
+		bs.counterLk.Unlock()
 		cancelFunc()
 		notif.Shutdown()
-	}()
+	}(bs)
 	procctx.CloseAfterContext(px, ctx) // parent cancelled first
 
 	return bs
@@ -281,6 +284,7 @@ type counters struct {
 	dataSent       uint64
 	dataRecvd      uint64
 	messagesRecvd  uint64
+	numDHT         uint64
 }
 
 // GetBlock attempts to retrieve a particular block from peers within the
