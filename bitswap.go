@@ -5,6 +5,7 @@ package bitswap
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"sync"
 	"time"
@@ -291,6 +292,14 @@ type counters struct {
 // deadline enforced by the context.
 func (bs *Bitswap) GetBlock(parent context.Context, k cid.Cid) (blocks.Block, error) {
 	return bsgetter.SyncGetBlock(parent, k, bs.GetBlocks)
+}
+
+// ResetStatCounters reset the stats of the bitswap node.
+func (bs *Bitswap) ResetStatCounters() {
+	fmt.Println("Resetting counters..")
+	bs.counterLk.Lock()
+	bs.counters = new(counters)
+	bs.counterLk.Unlock()
 }
 
 // WantlistForPeer returns the currently understood list of blocks requested by a
