@@ -20,6 +20,7 @@ type Stat struct {
 	DupDataReceived   uint64
 	MessagesReceived  uint64
 	NumDHT            uint64 // Number of times the protocol resorts to the DHT to find a block.
+	WantsRecvd        uint64
 }
 
 // Stat returns aggregated statistics about bitswap operations
@@ -37,6 +38,7 @@ func (bs *Bitswap) Stat() (*Stat, error) {
 	st.DataSent = c.dataSent
 	st.DataReceived = c.dataRecvd
 	st.MessagesReceived = c.messagesRecvd
+	st.WantsRecvd = c.wantsRecvd
 	st.NumDHT = c.numDHT
 	bs.counterLk.Unlock()
 

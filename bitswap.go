@@ -286,6 +286,7 @@ type counters struct {
 	dataRecvd      uint64
 	messagesRecvd  uint64
 	numDHT         uint64
+	wantsRecvd     uint64
 }
 
 // GetBlock attempts to retrieve a particular block from peers within the
@@ -441,6 +442,11 @@ func (bs *Bitswap) ReceiveMessage(ctx context.Context, p peer.ID, incoming bsmsg
 	if bs.wiretap != nil {
 		bs.wiretap.MessageReceived(p, incoming)
 	}
+	// Add to stats the number of want messages received.
+	wantlist := incoming.Wantlist()
+	bs.counterLk.Lock()
+	bs.counters.wantsRecvd += uint64(len(wantlist))
+	bs.counterLk.Unlock()
 
 	iblocks := incoming.Blocks()
 
