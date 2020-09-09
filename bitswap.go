@@ -25,6 +25,7 @@ import (
 	bssm "github.com/ipfs/go-bitswap/internal/sessionmanager"
 	bsspm "github.com/ipfs/go-bitswap/internal/sessionpeermanager"
 	bsmsg "github.com/ipfs/go-bitswap/message"
+	pb "github.com/ipfs/go-bitswap/message/pb"
 	bsnet "github.com/ipfs/go-bitswap/network"
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
@@ -277,16 +278,18 @@ type Bitswap struct {
 }
 
 type counters struct {
-	blocksRecvd    uint64
-	dupBlocksRecvd uint64
-	dupDataRecvd   uint64
-	blockDataRecvd uint64
-	blocksSent     uint64
-	dataSent       uint64
-	dataRecvd      uint64
-	messagesRecvd  uint64
-	numDHT         uint64
-	wantsRecvd     uint64
+	blocksRecvd     uint64
+	dupBlocksRecvd  uint64
+	dupDataRecvd    uint64
+	blockDataRecvd  uint64
+	blocksSent      uint64
+	dataSent        uint64
+	dataRecvd       uint64
+	messagesRecvd   uint64
+	numDHT          uint64
+	wantsRecvd      uint64
+	wantHavesRecvd  uint64
+	wantBlocksRecvd uint64
 }
 
 // GetBlock attempts to retrieve a particular block from peers within the
@@ -447,6 +450,32 @@ func (bs *Bitswap) ReceiveMessage(ctx context.Context, p peer.ID, incoming bsmsg
 	bs.counterLk.Lock()
 	bs.counters.wantsRecvd += uint64(len(wantlist))
 	bs.counterLk.Unlock()
+	// Add to stats the number and type of want messages.
+	go func(bs *Bitswap) {
+		entries := incoming.Wantlist()
+		var (
+			wants      = 0
+			wanthaves  = 0
+			wantblocks = 0
+		)
+		// For each want message check the type. Do not account for cancels.
+		for _, et := range entries {
+			if !et.Cancel {
+				wants++
+				if et.WantType == pb.Message_Wantlist_Have {
+					wanthaves++
+				} else {
+					wantblocks++
+				}
+			}
+		}
+		// Update counters
+		bs.counterLk.Lock()
+		bs.counters.wantsRecvd += uint64(wants)
+		bs.counters.wantHavesRecvd += uint64(wanthaves)
+		bs.counters.wantBlocksRecvd += uint64(wantblocks)
+		bs.counterLk.Unlock()
+	}(bs)
 
 	iblocks := incoming.Blocks()
 
