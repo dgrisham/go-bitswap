@@ -21,7 +21,7 @@ type Session interface {
 	exchange.Fetcher
 	ID() uint64
 	ReceiveFrom(peer.ID, []cid.Cid, []cid.Cid, []cid.Cid)
-	Shutdown() uint64
+	Shutdown()
 }
 
 // SessionFactory generates a new session for the SessionManager to track.
@@ -99,7 +99,7 @@ func (sm *SessionManager) NewSession(ctx context.Context,
 	return session
 }
 
-func (sm *SessionManager) Shutdown() uint64 {
+func (sm *SessionManager) Shutdown() {
 	sm.sessLk.Lock()
 
 	sessions := make([]Session, 0, len(sm.sessions))
@@ -111,12 +111,11 @@ func (sm *SessionManager) Shutdown() uint64 {
 	// the sessions once
 	sm.sessions = nil
 
-	var numDHTCounter uint64
-	// Update information about numDHT when closing sessions.
+	sm.sessLk.Unlock()
+
 	for _, ses := range sessions {
-		numDHTCounter += ses.Shutdown()
+		ses.Shutdown()
 	}
-	return numDHTCounter
 }
 
 func (sm *SessionManager) RemoveSession(sesid uint64) {

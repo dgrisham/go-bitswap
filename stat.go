@@ -19,7 +19,6 @@ type Stat struct {
 	BlockDataReceived uint64
 	DupDataReceived   uint64
 	MessagesReceived  uint64
-	NumDHT            uint64 // Number of times the protocol resorts to the DHT to find a block.
 	WantsRecvd        uint64
 	WantHavesRecvd    uint64
 	WantBlocksRecvd   uint64
@@ -40,7 +39,6 @@ func (bs *Bitswap) Stat() (*Stat, error) {
 	st.DataSent = c.dataSent
 	st.DataReceived = c.dataRecvd
 	st.MessagesReceived = c.messagesRecvd
-	st.NumDHT = c.numDHT
 	st.WantsRecvd = c.wantsRecvd
 	st.WantHavesRecvd = c.wantHavesRecvd
 	st.WantBlocksRecvd = c.wantBlocksRecvd
