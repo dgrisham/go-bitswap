@@ -421,7 +421,7 @@ func assertStat(t *testing.T, st *bitswap.Stat, sblks, rblks, sdata, rdata uint6
 	}
 
 	if rdata != st.DataReceived {
-		t.Errorf("mismatch in data recvd: %d vs %d", rdata, st.DataReceived)
+		t.Errorf("mismatch in data recvd: %d vs %d", rdata, st.BlockDataReceived)
 	}
 }
 
