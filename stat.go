@@ -22,11 +22,14 @@ type Stat struct {
 	WantsRecvd        uint64
 	WantHavesRecvd    uint64
 	WantBlocksRecvd   uint64
+	StreamDataSent    uint64
 }
 
 // Stat returns aggregated statistics about bitswap operations
 func (bs *Bitswap) Stat() (*Stat, error) {
 	st := new(Stat)
+	netStats := bs.network.Stats()
+
 	st.ProvideBufLen = len(bs.newBlocks)
 	st.Wantlist = bs.GetWantlist()
 	bs.counterLk.Lock()
@@ -42,6 +45,7 @@ func (bs *Bitswap) Stat() (*Stat, error) {
 	st.WantsRecvd = c.wantsRecvd
 	st.WantHavesRecvd = c.wantHavesRecvd
 	st.WantBlocksRecvd = c.wantBlocksRecvd
+	st.StreamDataSent = netStats.StreamDataSent
 	bs.counterLk.Unlock()
 
 	peers := bs.engine.Peers()

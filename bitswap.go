@@ -285,6 +285,7 @@ type counters struct {
 	wantsRecvd      uint64
 	wantHavesRecvd  uint64
 	wantBlocksRecvd uint64
+	streamDataSent  uint64
 }
 
 // GetBlock attempts to retrieve a particular block from peers within the
