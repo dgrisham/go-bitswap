@@ -11,6 +11,7 @@ import (
 
 	delay "github.com/ipfs/go-ipfs-delay"
 
+	deciface "github.com/ipfs/go-bitswap/decision"
 	bsbpm "github.com/ipfs/go-bitswap/internal/blockpresencemanager"
 	decision "github.com/ipfs/go-bitswap/internal/decision"
 	bsgetter "github.com/ipfs/go-bitswap/internal/getter"
@@ -92,6 +93,13 @@ func RebroadcastDelay(newRebroadcastDelay delay.D) Option {
 func SetSendDontHaves(send bool) Option {
 	return func(bs *Bitswap) {
 		bs.engine.SetSendDontHaves(send)
+	}
+}
+
+// Configures the engine to use the given score decision logic.
+func WithScoreLedger(scoreLedger deciface.ScoreLedger) Option {
+	return func(bs *Bitswap) {
+		bs.engine.UseScoreLedger(scoreLedger)
 	}
 }
 
@@ -243,6 +251,9 @@ type Bitswap struct {
 	dupMetric     metrics.Histogram
 	allMetric     metrics.Histogram
 	sentHistogram metrics.Histogram
+
+	// External statistics interface
+	wiretap WireTap
 
 	// the SessionManager routes requests to interested sessions
 	sm *bssm.SessionManager
@@ -410,6 +421,10 @@ func (bs *Bitswap) ReceiveMessage(ctx context.Context, p peer.ID, incoming bsmsg
 	bs.engine.MessageReceived(ctx, p, incoming)
 	// TODO: this is bad, and could be easily abused.
 	// Should only track *useful* messages in ledger
+
+	if bs.wiretap != nil {
+		bs.wiretap.MessageReceived(p, incoming)
+	}
 
 	iblocks := incoming.Blocks()
 
