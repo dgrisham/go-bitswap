@@ -550,7 +550,12 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 	if len(activeEntries) > 0 {
 		e.peerRequestQueue.PushTasks(p, activeEntries...)
 		// make sure peer has an weight associated weight
-		e.peerRequestQueue.SetWeight(p, int(math.Floor(l.Accounting.Value()))) // TODO
+		receipt := e.scoreLedger.GetReceipt(p)
+		if receipt == nil {
+			log.Warnw("Failed to find scoreledger for peer", "peerID", p) // TODO?
+		} else {
+			e.peerRequestQueue.SetWeight(p, int(math.Floor(receipt.Value))) // TODO -- pass Value through function
+		}
 	}
 }
 
@@ -633,7 +638,12 @@ func (e *Engine) ReceiveFrom(from peer.ID, blks []blocks.Block, haves []cid.Cid)
 			}
 		}
 		// update peer weight since ledge value changed
-		e.peerRequestQueue.SetWeight(l.Partner, int(math.Floor(l.Accounting.Value()))) // TODO
+		receipt := e.scoreLedger.GetReceipt(l.Partner)
+		if receipt == nil {
+			log.Warnw("Failed to find scoreledger for peer", "peerID", l.Partner) // TODO?
+		} else {
+			e.peerRequestQueue.SetWeight(l.Partner, int(math.Floor(receipt.Value))) // TODO -- pass Value through function
+		}
 		l.lk.RUnlock()
 	}
 	e.lock.RUnlock()
@@ -662,7 +672,12 @@ func (e *Engine) MessageSent(p peer.ID, m bsmsg.BitSwapMessage) {
 		l.wantList.RemoveType(block.Cid(), pb.Message_Wantlist_Block)
 	}
 	// update peer weight since ledge value changed
-	e.peerRequestQueue.SetWeight(p, int(math.Floor(l.Accounting.Value()))) // TODO
+	receipt := e.scoreLedger.GetReceipt(p)
+	if receipt == nil {
+		log.Warnw("Failed to find scoreledger for peer", "peerID", p) // TODO?
+	} else {
+		e.peerRequestQueue.SetWeight(p, int(math.Floor(receipt.Value))) // TODO -- pass Value through function
+	}
 
 	// Remove sent block presences from the want list for the peer
 	for _, bp := range m.BlockPresences() {
