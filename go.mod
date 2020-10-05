@@ -28,11 +28,9 @@ require (
 	github.com/libp2p/go-msgio v0.0.4
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multistream v0.1.1
-	github.com/whyrusleeping/gx v0.14.3 // indirect
-	github.com/whyrusleeping/gx-go v1.9.0 // indirect
 	go.uber.org/zap v1.14.1
 )
 
-replace github.com/ipfs/go-peertaskqueue => ../go-peertaskqueue
+replace github.com/ipfs/go-peertaskqueue => github.com/dgrisham/go-peertaskqueue v0.2.1-0.20200706214726-132280c980c2
 
 go 1.12
