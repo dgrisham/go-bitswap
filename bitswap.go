@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"sync"
 	"time"
 
@@ -38,8 +37,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
-var log = logging.Logger("bitswap")
-var sflog = log.Desugar()
+var (
+	log   = logging.Logger("bitswap")
+	sflog = log.Desugar()
+)
 
 var _ exchange.SessionExchange = (*Bitswap)(nil)
 
@@ -110,7 +111,12 @@ func WithScoreLedger(scoreLedger deciface.ScoreLedger) Option {
 // delegate. Runs until context is cancelled or bitswap.Close is called.
 func New(parent context.Context, network bsnet.BitSwapNetwork,
 	bstore blockstore.Blockstore, options ...Option) exchange.Interface {
+	return NewPeerWeights(parent, network, bstore, 10000, options...)
+}
 
+// @dgrisham prq peer-weights
+func NewPeerWeights(parent context.Context, network bsnet.BitSwapNetwork,
+	bstore blockstore.Blockstore, prqRoundSize int, options ...Option) exchange.Interface {
 	// important to use provided parent context (since it may include important
 	// loggable data). It's probably not a good idea to allow bitswap to be
 	// coupled to the concerns of the ipfs daemon in this way.
@@ -168,7 +174,7 @@ func New(parent context.Context, network bsnet.BitSwapNetwork,
 	}
 	notif := notifications.New()
 	sm = bssm.New(ctx, sessionFactory, sim, sessionPeerManagerFactory, bpm, pm, notif, network.Self())
-	engine := decision.NewEngine(ctx, bstore, network.ConnectionManager(), network.Self())
+	engine := decision.NewEnginePeerWeights(ctx, bstore, network.ConnectionManager(), network.Self(), prqRoundSize)
 
 	bs := &Bitswap{
 		blockstore:       bstore,

@@ -171,7 +171,7 @@ type Engine struct {
 }
 
 // NewEngine creates a new block sending engine for the given block store
-func NewEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID) *Engine {
+func NewEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID, prqRoundSize int) *Engine {
 	return newEngine(ctx, bs, peerTagger, self, maxBlockSizeReplaceHasWithBlock, nil)
 }
 
@@ -194,6 +194,38 @@ func newEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger,
 	e.tagQueued = fmt.Sprintf(tagFormat, "queued", uuid.New().String())
 	e.tagUseful = fmt.Sprintf(tagFormat, "useful", uuid.New().String())
 	e.peerRequestQueue = peertaskqueue.New(
+		peertaskqueue.OnPeerAddedHook(e.onPeerAdded),
+		peertaskqueue.OnPeerRemovedHook(e.onPeerRemoved),
+		peertaskqueue.TaskMerger(newTaskMerger()),
+		peertaskqueue.IgnoreFreezing(true))
+	return e
+}
+
+// NewEngine creates a new block sending engine for the given block store
+func NewEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID, prqRoundSize int) *Engine {
+	return newEnginePeerWeights(ctx, bs, peerTagger, self, maxBlockSizeReplaceHasWithBlock, nil, prqRoundSize)
+}
+
+// @dgrisham prq peer-weights
+func newEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID,
+	maxReplaceSize int, scoreLedger ScoreLedger, prqRoundSize int) *Engine {
+	e := &Engine{
+		ledgerMap:                       make(map[peer.ID]*ledger),
+		scoreLedger:                     scoreLedger,
+		bsm:                             newBlockstoreManager(ctx, bs, blockstoreWorkerCount),
+		peerTagger:                      peerTagger,
+		outbox:                          make(chan (<-chan *Envelope), outboxChanBuffer),
+		workSignal:                      make(chan struct{}, 1),
+		ticker:                          time.NewTicker(time.Millisecond * 100),
+		maxBlockSizeReplaceHasWithBlock: maxReplaceSize,
+		taskWorkerCount:                 taskWorkerCount,
+		sendDontHaves:                   true,
+		self:                            self,
+	}
+	e.tagQueued = fmt.Sprintf(tagFormat, "queued", uuid.New().String())
+	e.tagUseful = fmt.Sprintf(tagFormat, "useful", uuid.New().String())
+	e.peerRequestQueue = peertaskqueue.NewWithRoundSize(
+		prqRoundSize,
 		peertaskqueue.OnPeerAddedHook(e.onPeerAdded),
 		peertaskqueue.OnPeerRemovedHook(e.onPeerRemoved),
 		peertaskqueue.TaskMerger(newTaskMerger()),
@@ -549,11 +581,10 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 	// Push entries onto the request queue
 	if len(activeEntries) > 0 {
 		e.peerRequestQueue.PushTasks(p, activeEntries...)
-		// make sure peer has an weight associated weight
 		receipt := e.scoreLedger.GetReceipt(p)
 		if receipt == nil {
-			log.Warnw("Failed to find scoreledger for peer", "peerID", p) // TODO?
-		} else {
+			log.Warnw("Failed to find scoreledger for peer", "peerID", p)
+		} else { // set peer's weight based on its ledger value
 			e.peerRequestQueue.SetWeight(p, int(math.Floor(receipt.Value))) // TODO -- pass Value through function
 		}
 	}
