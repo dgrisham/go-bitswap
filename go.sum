@@ -46,6 +46,8 @@ github.com/dgraph-io/badger v1.6.0-rc1/go.mod h1:zwt7syl517jmP8s94KqSxTlM6IMsdhY
 github.com/dgraph-io/badger v1.6.0/go.mod h1:zwt7syl517jmP8s94KqSxTlM6IMsdhYy6psNgSztDR4=
 github.com/dgraph-io/badger v1.6.1/go.mod h1:FRmFw3uxvcpa8zG3Rxs0th+hCLIuaQg8HlNV5bjgnuU=
 github.com/dgraph-io/ristretto v0.0.2/go.mod h1:KPxhHT9ZxKefz+PCeOGsrHpl1qZ7i70dGTu2u+Ahh6E=
+github.com/dgrisham/go-peertaskqueue v0.2.0 h1:4AQJemLK7pe2/+jjjEcTxusuubJq6bqz1x4ZUmSoRrY=
+github.com/dgrisham/go-peertaskqueue v0.2.0/go.mod h1:5/eNrBEbtSKWCG+kQK8K8fGNixoYUnr+P7jivavs9lY=
 github.com/dgrisham/go-peertaskqueue v0.2.1-0.20200706214726-132280c980c2 h1:C0y7aX5kjtlG5AkJG6s/hNbhmGF3TaoUQAEPnX/RQlg=
 github.com/dgrisham/go-peertaskqueue v0.2.1-0.20200706214726-132280c980c2/go.mod h1:1lV0daUNrxHsokXnbSJ8oWicS8XYv7R00VjI2oxw4Tk=
 github.com/dgryski/go-farm v0.0.0-20190104051053-3adb47b1fb0f/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=

@@ -131,6 +131,9 @@ type Engine struct {
 	// outbox.
 	peerRequestQueue *peertaskqueue.PeerTaskQueue
 
+	// TODO
+	weightFunc weightFunction
+
 	// FIXME it's a bit odd for the client and the worker to both share memory
 	// (both modify the peerRequestQueue) and also to communicate over the
 	// workSignal channel. consider sending requests over the channel and
@@ -170,6 +173,18 @@ type Engine struct {
 	self peer.ID
 }
 
+type weightFunction func(peerValue int) int
+
+var identityWeightFunc weightFunction = func(value int) int {
+	return value
+}
+
+var weightFuncs = map[string]weightFunction{
+	"identity": identityWeightFunc,
+}
+
+var defaultWeightFunc = identityWeightFunc
+
 // NewEngine creates a new block sending engine for the given block store
 func NewEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID, prqRoundSize int) *Engine {
 	return newEngine(ctx, bs, peerTagger, self, maxBlockSizeReplaceHasWithBlock, nil)
@@ -202,16 +217,22 @@ func newEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger,
 }
 
 // NewEngine creates a new block sending engine for the given block store
-func NewEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID, prqRoundSize int) *Engine {
-	return newEnginePeerWeights(ctx, bs, peerTagger, self, maxBlockSizeReplaceHasWithBlock, nil, prqRoundSize)
+func NewEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID, weightFuncName string, prqRoundSize int) *Engine {
+	return newEnginePeerWeights(ctx, bs, peerTagger, self, maxBlockSizeReplaceHasWithBlock, nil, weightFuncName, prqRoundSize)
 }
 
 // @dgrisham prq peer-weights
 func newEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID,
-	maxReplaceSize int, scoreLedger ScoreLedger, prqRoundSize int) *Engine {
+	maxReplaceSize int, scoreLedger ScoreLedger, weightFuncName string, prqRoundSize int) *Engine {
+	weightFunc, ok := weightFuncs[weightFuncName]
+	if !ok {
+		weightFunc = defaultWeightFunc
+	}
+
 	e := &Engine{
 		ledgerMap:                       make(map[peer.ID]*ledger),
 		scoreLedger:                     scoreLedger,
+		weightFunc:                      weightFunc,
 		bsm:                             newBlockstoreManager(ctx, bs, blockstoreWorkerCount),
 		peerTagger:                      peerTagger,
 		outbox:                          make(chan (<-chan *Envelope), outboxChanBuffer),
@@ -585,7 +606,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		if receipt == nil {
 			log.Warnw("Failed to find scoreledger for peer", "peerID", p)
 		} else { // set peer's weight based on its ledger value
-			e.peerRequestQueue.SetWeight(p, int(math.Floor(receipt.Value))) // TODO -- pass Value through function
+			e.peerRequestQueue.SetWeight(p, e.weightFunc(int(math.Floor(receipt.Value)))) // TODO -- pass Value through function
 		}
 	}
 }

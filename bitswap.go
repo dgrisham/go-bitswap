@@ -116,7 +116,7 @@ func New(parent context.Context, network bsnet.BitSwapNetwork,
 
 // @dgrisham prq peer-weights
 func NewPeerWeights(parent context.Context, network bsnet.BitSwapNetwork,
-	bstore blockstore.Blockstore, prqRoundSize int, options ...Option) exchange.Interface {
+	bstore blockstore.Blockstore, prqWeightFunc string, prqRoundSize int, options ...Option) exchange.Interface {
 	// important to use provided parent context (since it may include important
 	// loggable data). It's probably not a good idea to allow bitswap to be
 	// coupled to the concerns of the ipfs daemon in this way.
@@ -174,7 +174,7 @@ func NewPeerWeights(parent context.Context, network bsnet.BitSwapNetwork,
 	}
 	notif := notifications.New()
 	sm = bssm.New(ctx, sessionFactory, sim, sessionPeerManagerFactory, bpm, pm, notif, network.Self())
-	engine := decision.NewEnginePeerWeights(ctx, bstore, network.ConnectionManager(), network.Self(), prqRoundSize)
+	engine := decision.NewEnginePeerWeights(ctx, bstore, network.ConnectionManager(), network.Self(), prqWeightFunc, prqRoundSize)
 
 	bs := &Bitswap{
 		blockstore:       bstore,
