@@ -111,7 +111,7 @@ func WithScoreLedger(scoreLedger deciface.ScoreLedger) Option {
 // delegate. Runs until context is cancelled or bitswap.Close is called.
 func New(parent context.Context, network bsnet.BitSwapNetwork,
 	bstore blockstore.Blockstore, options ...Option) exchange.Interface {
-	return NewPeerWeights(parent, network, bstore, 10000, options...)
+	return NewPeerWeights(parent, network, bstore, "identity", 10000, options...)
 }
 
 // @dgrisham prq peer-weights
