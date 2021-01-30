@@ -294,6 +294,16 @@ type counters struct {
 	streamDataSent  uint64
 }
 
+// NOTE (@dgrisham): function to directly add to peer's received bytes total for testing purposes
+func (bs *Bitswap) AddToLedgerReceivedBytes(from peer.ID, n int) {
+	bs.engine.AddToLedgerReceivedBytes(from, n)
+}
+
+// NOTE (@dgrisham): function to directly add to peer's sent bytes total for testing purposes
+func (bs *Bitswap) AddToLedgerSentBytes(from peer.ID, n int) {
+	bs.engine.AddToLedgerSentBytes(from, n)
+}
+
 // GetBlock attempts to retrieve a particular block from peers within the
 // deadline enforced by the context.
 func (bs *Bitswap) GetBlock(parent context.Context, k cid.Cid) (blocks.Block, error) {
