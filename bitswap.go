@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"sync"
 	"time"
 
@@ -38,8 +37,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
-var log = logging.Logger("bitswap")
-var sflog = log.Desugar()
+var (
+	log   = logging.Logger("bitswap")
+	sflog = log.Desugar()
+)
 
 var _ exchange.SessionExchange = (*Bitswap)(nil)
 
@@ -110,7 +111,6 @@ func WithScoreLedger(scoreLedger deciface.ScoreLedger) Option {
 // delegate. Runs until context is cancelled or bitswap.Close is called.
 func New(parent context.Context, network bsnet.BitSwapNetwork,
 	bstore blockstore.Blockstore, options ...Option) exchange.Interface {
-
 	// important to use provided parent context (since it may include important
 	// loggable data). It's probably not a good idea to allow bitswap to be
 	// coupled to the concerns of the ipfs daemon in this way.
@@ -286,6 +286,16 @@ type counters struct {
 	wantHavesRecvd  uint64
 	wantBlocksRecvd uint64
 	streamDataSent  uint64
+}
+
+// NOTE (@dgrisham): function to directly add to peer's received bytes total for testing purposes
+func (bs *Bitswap) AddToLedgerReceivedBytes(from peer.ID, n int) {
+	bs.engine.AddToLedgerReceivedBytes(from, n)
+}
+
+// NOTE (@dgrisham): function to directly add to peer's sent bytes total for testing purposes
+func (bs *Bitswap) AddToLedgerSentBytes(from peer.ID, n int) {
+	bs.engine.AddToLedgerSentBytes(from, n)
 }
 
 // GetBlock attempts to retrieve a particular block from peers within the

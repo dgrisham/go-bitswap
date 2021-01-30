@@ -177,7 +177,6 @@ func NewEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger,
 // This constructor is used by the tests
 func newEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID,
 	maxReplaceSize int, scoreLedger ScoreLedger) *Engine {
-
 	e := &Engine{
 		ledgerMap:                       make(map[peer.ID]*ledger),
 		scoreLedger:                     scoreLedger,
@@ -564,6 +563,28 @@ func (e *Engine) splitWantsCancels(es []bsmsg.Entry) ([]bsmsg.Entry, []bsmsg.Ent
 		}
 	}
 	return wants, cancels
+}
+
+// NOTE (@dgrisham): function to directly add to peer's received bytes total for testing purposes
+func (e *Engine) AddToLedgerReceivedBytes(from peer.ID, n int) {
+	l := e.findOrCreate(from)
+	l.lk.Lock()
+
+	log.Debugw("@dgrisham increment received bytes for peer", "from", from, "size", n)
+	e.scoreLedger.AddToReceivedBytes(l.Partner, n)
+
+	l.lk.Unlock()
+}
+
+// NOTE (@dgrisham): function to directly add to peer's sent bytes total for testing purposes
+func (e *Engine) AddToLedgerSentBytes(from peer.ID, n int) {
+	l := e.findOrCreate(from)
+	l.lk.Lock()
+
+	log.Debugw("@dgrisham increment sent bytes for peer", "from", from, "size", n)
+	e.scoreLedger.AddToSentBytes(l.Partner, n)
+
+	l.lk.Unlock()
 }
 
 // ReceiveFrom is called when new blocks are received and added to the block
