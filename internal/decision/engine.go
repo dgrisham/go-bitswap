@@ -173,17 +173,20 @@ type Engine struct {
 	self peer.ID
 }
 
-type weightFunction func(peerValue int) int
+type weightFunction func(peerValue float64) int
 
-var identityWeightFunc weightFunction = func(value int) int {
-	return value
+var linearWeightFunc weightFunction = func(value float64) int {
+	if value == 0 {
+		return 0
+	}
+	return int(math.Ceil(1 / value))
 }
 
 var weightFuncs = map[string]weightFunction{
-	"identity": identityWeightFunc,
+	"identity": linearWeightFunc,
 }
 
-var defaultWeightFunc = identityWeightFunc
+var defaultWeightFunc = linearWeightFunc
 
 // NewEngine creates a new block sending engine for the given block store
 func NewEngine(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID, prqRoundSize int) *Engine {
@@ -606,7 +609,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		if receipt == nil {
 			log.Warnw("Failed to find scoreledger for peer", "peerID", p)
 		} else { // set peer's weight based on its ledger value
-			e.peerRequestQueue.SetWeight(p, e.weightFunc(int(math.Floor(receipt.Value)))) // TODO -- pass Value through function
+			e.peerRequestQueue.SetWeight(p, e.weightFunc(math.Floor(receipt.Value))) // TODO -- pass Value through function
 		}
 	}
 }
