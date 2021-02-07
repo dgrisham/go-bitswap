@@ -329,7 +329,9 @@ func (e *Engine) WantlistForPeer(p peer.ID) []wl.Entry {
 
 // LedgerForPeer returns aggregated data communication with a given peer.
 func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
-	return e.scoreLedger.GetReceipt(p)
+	l := e.scoreLedger.GetReceipt(p)
+	l.Weight, _ = e.peerRequestQueue.GetWeight(p)
+	return l
 }
 
 // Each taskWorker pulls items off the request queue up to the maximum size

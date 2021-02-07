@@ -66,6 +66,7 @@ type Receipt struct {
 	Sent      uint64
 	Recv      uint64
 	Exchanged uint64
+	Weight    int
 }
 
 // Increments the sent counter.
