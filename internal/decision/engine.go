@@ -330,7 +330,11 @@ func (e *Engine) WantlistForPeer(p peer.ID) []wl.Entry {
 // LedgerForPeer returns aggregated data communication with a given peer.
 func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
 	l := e.scoreLedger.GetReceipt(p)
-	l.Weight, _ = e.peerRequestQueue.GetWeight(p)
+	var err error
+	l.Weight, err = e.peerRequestQueue.GetWeight(p)
+	if err != nil {
+		l.Weight = -1
+	}
 	return l
 }
 
