@@ -176,10 +176,7 @@ type Engine struct {
 type weightFunction func(peerValue float64) int
 
 var linearWeightFunc weightFunction = func(value float64) int {
-	if value == 0 {
-		return 0
-	}
-	return int(math.Ceil(1 / value))
+	return int(math.Floor(value))
 }
 
 var weightFuncs = map[string]weightFunction{
