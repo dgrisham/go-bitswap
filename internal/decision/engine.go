@@ -173,10 +173,10 @@ type Engine struct {
 	self peer.ID
 }
 
-type weightFunction func(peerValue float64) int
+type weightFunction func(peerValue float64) float64
 
-var linearWeightFunc weightFunction = func(value float64) int {
-	return int(math.Floor(value))
+var linearWeightFunc weightFunction = func(value float64) float64 {
+	return 1 / (value + 1)
 }
 
 var weightFuncs = map[string]weightFunction{
