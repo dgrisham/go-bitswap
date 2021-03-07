@@ -35,6 +35,6 @@ require (
 // replace github.com/ipfs/go-peertaskqueue => github.com/dgrisham/go-peertaskqueue v0.2.1-0.20200706214726-132280c980c2
 // replace github.com/ipfs/go-peertaskqueue => github.com/dgrisham/go-peertaskqueue 8595068
 // replace github.com/ipfs/go-peertaskqueue => github.com/dgrisham/go-peertaskqueue
-replace github.com/ipfs/go-peertaskqueue v0.2.0 => github.com/dgrisham/go-peertaskqueue v0.2.0
+replace github.com/ipfs/go-peertaskqueue v0.2.0 => ../go-peertaskqueue
 
 go 1.12
