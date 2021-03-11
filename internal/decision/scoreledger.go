@@ -61,12 +61,13 @@ type scoreledger struct {
 // collecting various pieces of aggregated data for external
 // reporting purposes.
 type Receipt struct {
-	Peer      string
-	Value     float64
-	Sent      uint64
-	Recv      uint64
-	Exchanged uint64
-	Weight    float64
+	Peer          string
+	Value         float64
+	Sent          uint64
+	Recv          uint64
+	Exchanged     uint64
+	Weight        float64
+	WorkRemaining int
 }
 
 // Increments the sent counter.

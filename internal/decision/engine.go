@@ -4,7 +4,6 @@ package decision
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -176,7 +175,7 @@ type Engine struct {
 type weightFunction func(peerValue float64) float64
 
 var linearWeightFunc weightFunction = func(value float64) float64 {
-	return 1 / (value + 1)
+	return 1 / (value + 1) // ~= bytes_recv / bytes_sent -> the more we have received from the peer, the higher their weight
 }
 
 var weightFuncs = map[string]weightFunction{
@@ -328,9 +327,10 @@ func (e *Engine) WantlistForPeer(p peer.ID) []wl.Entry {
 func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
 	l := e.scoreLedger.GetReceipt(p)
 	var err error
-	l.Weight, err = e.peerRequestQueue.GetWeight(p)
+	l.Weight, l.WorkRemaining, err = e.peerRequestQueue.GetStats(p)
 	if err != nil {
 		l.Weight = -1
+		l.WorkRemaining = -1
 	}
 	return l
 }
@@ -612,7 +612,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		if receipt == nil {
 			log.Warnw("Failed to find scoreledger for peer", "peerID", p)
 		} else { // set peer's weight based on its ledger value
-			e.peerRequestQueue.SetWeight(p, e.weightFunc(math.Floor(receipt.Value)))
+			e.peerRequestQueue.SetWeight(p, e.weightFunc(receipt.Value))
 		}
 	}
 }
@@ -722,7 +722,7 @@ func (e *Engine) ReceiveFrom(from peer.ID, blks []blocks.Block, haves []cid.Cid)
 		if receipt == nil {
 			log.Warnw("Failed to find scoreledger for peer", "peerID", l.Partner) // TODO?
 		} else {
-			e.peerRequestQueue.SetWeight(l.Partner, e.weightFunc(math.Floor(receipt.Value)))
+			e.peerRequestQueue.SetWeight(l.Partner, e.weightFunc(receipt.Value))
 		}
 		l.lk.RUnlock()
 	}
@@ -756,7 +756,7 @@ func (e *Engine) MessageSent(p peer.ID, m bsmsg.BitSwapMessage) {
 	if receipt == nil {
 		log.Warnw("Failed to find scoreledger for peer", "peerID", p) // TODO?
 	} else {
-		e.peerRequestQueue.SetWeight(p, e.weightFunc(math.Floor(receipt.Value)))
+		e.peerRequestQueue.SetWeight(p, e.weightFunc(receipt.Value))
 	}
 
 	// Remove sent block presences from the want list for the peer
