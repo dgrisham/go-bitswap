@@ -312,6 +312,28 @@ func (dsl *DefaultScoreLedger) AddToReceivedBytes(p peer.ID, n int) {
 	l.AddToReceivedBytes(n)
 }
 
+// @dgrisham Sets the sent counter for the given peer (for experiments)
+func (dsl *DefaultScoreLedger) SetSentBytes(p peer.ID, n int) {
+	l := dsl.findOrCreate(p)
+
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	l.lastExchange = time.Now()
+	l.bytesSent = uint64(n)
+}
+
+// @dgrisham Sets the received counter for the given peer (for experiments)
+func (dsl *DefaultScoreLedger) SetReceivedBytes(p peer.ID, n int) {
+	l := dsl.findOrCreate(p)
+
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	l.lastExchange = time.Now()
+	l.bytesRecv = uint64(n)
+}
+
 // PeerConnected should be called when a new peer connects, meaning
 // we should open accounting.
 func (dsl *DefaultScoreLedger) PeerConnected(p peer.ID) {

@@ -111,6 +111,10 @@ type ScoreLedger interface {
 	AddToSentBytes(p peer.ID, n int)
 	// Increments the received counter for the given peer.
 	AddToReceivedBytes(p peer.ID, n int)
+	// Sets the sent counter for the given peer.
+	SetSentBytes(p peer.ID, n int)
+	// Sets the received counter for the given peer.
+	SetReceivedBytes(p peer.ID, n int)
 	// PeerConnected should be called when a new peer connects,
 	// meaning the ledger should open accounting.
 	PeerConnected(p peer.ID)
@@ -649,6 +653,28 @@ func (e *Engine) AddToLedgerSentBytes(from peer.ID, n int) {
 
 	log.Debugw("@dgrisham increment sent bytes for peer", "from", from, "size", n)
 	e.scoreLedger.AddToSentBytes(l.Partner, n)
+
+	l.lk.Unlock()
+}
+
+// NOTE (@dgrisham): function to directly set peer's received bytes total for testing purposes
+func (e *Engine) SetLedgerReceivedBytes(from peer.ID, n int) {
+	l := e.findOrCreate(from)
+	l.lk.Lock()
+
+	log.Debugw("@dgrisham increment received bytes for peer", "from", from, "size", n)
+	e.scoreLedger.SetReceivedBytes(l.Partner, n)
+
+	l.lk.Unlock()
+}
+
+// NOTE (@dgrisham): function to directly set peer's sent bytes total for testing purposes
+func (e *Engine) SetLedgerSentBytes(from peer.ID, n int) {
+	l := e.findOrCreate(from)
+	l.lk.Lock()
+
+	log.Debugw("@dgrisham increment sent bytes for peer", "from", from, "size", n)
+	e.scoreLedger.SetSentBytes(l.Partner, n)
 
 	l.lk.Unlock()
 }

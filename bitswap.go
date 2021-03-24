@@ -304,6 +304,16 @@ func (bs *Bitswap) AddToLedgerSentBytes(from peer.ID, n int) {
 	bs.engine.AddToLedgerSentBytes(from, n)
 }
 
+// NOTE (@dgrisham): function to directly set peer's received bytes total for testing purposes
+func (bs *Bitswap) SetLedgerReceivedBytes(from peer.ID, n int) {
+	bs.engine.SetLedgerReceivedBytes(from, n)
+}
+
+// NOTE (@dgrisham): function to directly set peer's sent bytes total for testing purposes
+func (bs *Bitswap) SetLedgerSentBytes(from peer.ID, n int) {
+	bs.engine.SetLedgerSentBytes(from, n)
+}
+
 // GetBlock attempts to retrieve a particular block from peers within the
 // deadline enforced by the context.
 func (bs *Bitswap) GetBlock(parent context.Context, k cid.Cid) (blocks.Block, error) {
