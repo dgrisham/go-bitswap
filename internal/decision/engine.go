@@ -4,6 +4,7 @@ package decision
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -182,8 +183,13 @@ var linearWeightFunc weightFunction = func(value float64) float64 {
 	return 1 / (value + 1) // ~= bytes_recv / bytes_sent -> the more we have received from the peer, the higher their weight
 }
 
+var exponentialWeightFunc weightFunction = func(value float64) float64 {
+	return 1 / (1 + math.Exp(6-3*value))
+}
+
 var weightFuncs = map[string]weightFunction{
-	"identity": linearWeightFunc,
+	"identity":    linearWeightFunc,
+	"exponential": exponentialWeightFunc,
 }
 
 var defaultWeightFunc = linearWeightFunc
