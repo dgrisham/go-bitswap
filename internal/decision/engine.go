@@ -348,9 +348,10 @@ func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
 	return l
 }
 
-// LedgerForPeer returns aggregated data communication with a given peer.
+// @dgrisham (for test metrics) returns true if the PRQ round was reset since the
+// last time we checked
 func (e *Engine) RoundReset() bool {
-	// @dgrisham (for test metrics) prq sets this to true whenever a new round starts,
+	//  prq sets this to true whenever a new round starts,
 	// and we reset it to false once we capture the reset
 	roundReset := e.peerRequestQueue.RoundReset
 	if roundReset { // unset the flag since

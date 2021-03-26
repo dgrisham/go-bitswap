@@ -340,8 +340,13 @@ func (bs *Bitswap) WantlistForPeer(p peer.ID) []cid.Cid {
 
 // LedgerForPeer returns aggregated data about blocks swapped and communication
 // with a given peer.
-func (bs *Bitswap) LedgerForPeer(p peer.ID) (*decision.Receipt, bool) {
+func (bs *Bitswap) LedgerForPeer(p peer.ID) *decision.Receipt {
 	return bs.engine.LedgerForPeer(p)
+}
+
+// @dgrisham
+func (bs *Bitswap) RoundReset() bool {
+	return bs.engine.RoundReset()
 }
 
 // GetBlocks returns a channel where the caller may receive blocks that
