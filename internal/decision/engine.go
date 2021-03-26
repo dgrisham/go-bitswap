@@ -184,7 +184,7 @@ var linearWeightFunc weightFunction = func(value float64) float64 {
 }
 
 var sigmoidWeightFunc weightFunction = func(value float64) float64 {
-	return 1 / (1 + math.Exp(6-3*value))
+	return 1 / (1 + math.Exp(2*(value-1)))
 }
 
 var weightFuncs = map[string]weightFunction{
