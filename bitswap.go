@@ -340,7 +340,7 @@ func (bs *Bitswap) WantlistForPeer(p peer.ID) []cid.Cid {
 
 // LedgerForPeer returns aggregated data about blocks swapped and communication
 // with a given peer.
-func (bs *Bitswap) LedgerForPeer(p peer.ID) *decision.Receipt {
+func (bs *Bitswap) LedgerForPeer(p peer.ID) (*decision.Receipt, bool) {
 	return bs.engine.LedgerForPeer(p)
 }
 

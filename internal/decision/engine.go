@@ -334,15 +334,24 @@ func (e *Engine) WantlistForPeer(p peer.ID) []wl.Entry {
 }
 
 // LedgerForPeer returns aggregated data communication with a given peer.
-func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
+func (e *Engine) LedgerForPeer(p peer.ID) (*Receipt, bool) {
 	l := e.scoreLedger.GetReceipt(p)
 	var err error
+
+	// @dgrisham (for test metrics) add weight/work remaining
 	l.Weight, l.WorkRemaining, err = e.peerRequestQueue.GetStats(p)
 	if err != nil {
 		l.Weight = -1
 		l.WorkRemaining = -1
 	}
-	return l
+
+	// @dgrisham (for test metrics) prq sets this to true whenever a new round starts,
+	// and we reset it to false once we capture the reset
+	roundReset := e.peerRequestQueue.RoundReset
+	if roundReset { // unset the flag since
+		e.peerRequestQueue.RoundReset = false
+	}
+	return l, roundReset
 }
 
 // Each taskWorker pulls items off the request queue up to the maximum size
