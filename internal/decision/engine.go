@@ -187,9 +187,14 @@ var sigmoidWeightFunc weightFunction = func(value float64) float64 {
 	return 1 / (1 + math.Exp(2*(value-1)))
 }
 
+var freerideWeightFunc weightFunction = func(value float64) float64 {
+	return 0
+}
+
 var weightFuncs = map[string]weightFunction{
 	"identity": linearWeightFunc,
 	"sigmoid":  sigmoidWeightFunc,
+	"freeride": freerideWeightFunc,
 }
 
 var defaultWeightFunc = linearWeightFunc
