@@ -221,6 +221,11 @@ func NewPeerWeights(parent context.Context, network bsnet.BitSwapNetwork,
 	return bs
 }
 
+// @dgrisham override weight function
+func (bs *Bitswap) SetWeightFunc(weightFuncName string) error {
+	return bs.engine.SetWeightFunc(weightFuncName)
+}
+
 // Bitswap instances implement the bitswap protocol.
 type Bitswap struct {
 	pm *bspm.PeerManager

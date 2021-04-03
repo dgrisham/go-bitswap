@@ -276,6 +276,15 @@ func newEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger 
 	return e
 }
 
+func (e *Engine) SetWeightFunc(weightFuncName string) error {
+	weightFunc, ok := weightFuncs[weightFuncName]
+	if !ok {
+		return fmt.Errorf("Weight function '%s' not found", weightFuncName)
+	}
+	e.weightFunc = weightFunc
+	return nil
+}
+
 // SetSendDontHaves indicates what to do when the engine receives a want-block
 // for a block that is not in the blockstore. Either
 // - Send a DONT_HAVE message
