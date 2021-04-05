@@ -221,7 +221,7 @@ func NewPeerWeights(parent context.Context, network bsnet.BitSwapNetwork,
 	return bs
 }
 
-// @dgrisham override weight function
+// @dgrisham override decision engine weight function
 func (bs *Bitswap) SetWeightFunc(weightFuncName string) error {
 	return bs.engine.SetWeightFunc(weightFuncName)
 }
