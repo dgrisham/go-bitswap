@@ -179,6 +179,10 @@ type Engine struct {
 
 type weightFunction func(peerValue float64) float64
 
+var constantWeightFunc weightFunction = func(value float64) float64 {
+	return 1
+}
+
 var linearWeightFunc weightFunction = func(value float64) float64 {
 	return 1 / (value + 1) // ~= bytes_recv_from / bytes_sent_to -> the more we have received from the peer, the higher their weight
 }
@@ -203,6 +207,7 @@ var weightFuncs = map[string]weightFunction{
 	"sigmoid":  sigmoidWeightFunc,
 	"freeride": freerideWeightFunc,
 	"payDebts": payDebtsWeightFunc,
+	"constant": constantWeightFunc,
 }
 
 var defaultWeightFunc = linearWeightFunc
