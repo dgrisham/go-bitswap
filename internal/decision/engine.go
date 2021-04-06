@@ -252,8 +252,8 @@ func NewEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger 
 func newEnginePeerWeights(ctx context.Context, bs bstore.Blockstore, peerTagger PeerTagger, self peer.ID,
 	maxReplaceSize int, scoreLedger ScoreLedger, weightFuncName string, prqRoundSize int) *Engine {
 	weightFunc, ok := weightFuncs[weightFuncName]
-	if !ok {
-		weightFunc = defaultWeightFunc
+	if !ok { // weight function not found, hard stop
+		return nil
 	}
 
 	e := &Engine{
