@@ -196,7 +196,7 @@ var freerideWeightFunc weightFunction = func(value float64) float64 {
 }
 
 var payDebtsWeightFunc weightFunction = func(value float64) float64 {
-	if value <= 0.2 {
+	if value <= 0.5 {
 		return 1
 	}
 	return 0
